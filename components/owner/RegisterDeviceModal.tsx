@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Smartphone, Upload, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { X, Smartphone, Upload, CheckCircle2, AlertCircle, RefreshCw, FileCheck } from "lucide-react";
 import { validateImeiLuhn } from "@/lib/utils/luhn";
+import { uploadReceiptProof } from "@/lib/storage/cloudinary";
 
 interface RegisterDeviceModalProps {
   isOpen: boolean;
@@ -20,11 +21,29 @@ export default function RegisterDeviceModal({
   const [imeiPrimary, setImeiPrimary] = useState("");
   const [imeiSecondary, setImeiSecondary] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [receiptFileName, setReceiptFileName] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setReceiptFileName(file.name);
+    try {
+      const result = await uploadReceiptProof(file);
+      setReceiptUrl(result.url);
+    } catch (err: any) {
+      setErrorMsg("Receipt upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +76,7 @@ export default function RegisterDeviceModal({
         imei_primary: cleanImei1,
         imei_secondary: imeiSecondary.trim() || null,
         serial_number: serialNumber.trim() || null,
-        purchase_receipt_url: receiptFileName ? `https://storage.rupalshield.io/receipts/${receiptFileName}` : null,
+        purchase_receipt_url: receiptUrl,
       };
 
       const res = await fetch("/api/devices", {
@@ -82,27 +101,32 @@ export default function RegisterDeviceModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-neutral-950 border border-neutral-800 rounded-xl p-6 font-mono text-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="w-full max-w-lg glass-panel rounded-3xl p-6 sm:p-7 text-zinc-100 shadow-2xl border-zinc-700/60 max-h-[90vh] overflow-y-auto">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-neutral-800 pb-3 mb-4">
-          <div className="flex items-center gap-2">
-            <Smartphone className="w-4 h-4 text-white" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider">
-              Register Device Deed
-            </h2>
+        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4 mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-zinc-800 flex items-center justify-center">
+              <Smartphone className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold tracking-wide text-white">
+                Register Device Deed
+              </h2>
+              <span className="text-[11px] text-zinc-400">Anchor ownership in the national registry</span>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="text-neutral-500 hover:text-white p-1 rounded transition"
+            className="text-zinc-400 hover:text-white p-1.5 rounded-full hover:bg-zinc-800/60 transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {errorMsg && (
-          <div className="bg-neutral-900 border border-neutral-800 text-neutral-200 text-xs p-3 rounded mb-4 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-white shrink-0" />
+          <div className="glass-panel border-amber-500/30 text-amber-200 text-xs p-3 rounded-2xl mb-4 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -110,40 +134,40 @@ export default function RegisterDeviceModal({
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Brand / Maker *</label>
+              <label className="block text-zinc-400 mb-1.5 font-medium">Brand / Maker *</label>
               <input
                 required
                 type="text"
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
-                placeholder="e.g. Apple, Samsung"
-                className="w-full bg-black border border-neutral-800 rounded px-3 py-2 text-white focus:outline-none focus:border-white"
+                placeholder="e.g. Apple, Google"
+                className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-zinc-500 transition"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Model Name / Number *</label>
+              <label className="block text-zinc-400 mb-1.5 font-medium">Model Designation *</label>
               <input
                 required
                 type="text"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g. iPhone 15 Pro, S24"
-                className="w-full bg-black border border-neutral-800 rounded px-3 py-2 text-white focus:outline-none focus:border-white"
+                placeholder="e.g. iPhone 15 Pro"
+                className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-zinc-500 transition"
               />
             </div>
           </div>
 
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-[11px] text-neutral-400">Primary IMEI (15 Digits) *</label>
+            <div className="flex justify-between items-center mb-1.5 font-medium">
+              <label className="text-zinc-400">Primary IMEI (15 Digits) *</label>
               {imeiPrimary.length === 15 && (
                 <span className="text-[10px]">
                   {validateImeiLuhn(imeiPrimary) ? (
-                    <span className="text-neutral-300 flex items-center gap-0.5">
-                      <CheckCircle2 className="w-3 h-3 text-white inline" /> Valid Luhn
+                    <span className="text-emerald-400 flex items-center gap-0.5">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400 inline" /> Valid Luhn
                     </span>
                   ) : (
-                    <span className="text-neutral-500">Luhn Mismatch</span>
+                    <span className="text-zinc-400">Luhn Mismatch</span>
                   )}
                 </span>
               )}
@@ -155,70 +179,84 @@ export default function RegisterDeviceModal({
               value={imeiPrimary}
               onChange={(e) => setImeiPrimary(e.target.value.replace(/[^0-9]/g, ""))}
               placeholder="358742091234567"
-              className="w-full bg-black border border-neutral-800 rounded px-3 py-2 text-white tracking-widest focus:outline-none focus:border-white"
+              className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-white tracking-widest font-mono focus:outline-none focus:border-zinc-500 transition"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Secondary IMEI (Optional)</label>
+              <label className="block text-zinc-400 mb-1.5 font-medium">Secondary IMEI (Optional)</label>
               <input
                 type="text"
                 maxLength={15}
                 value={imeiSecondary}
                 onChange={(e) => setImeiSecondary(e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="eSIM or SIM 2"
-                className="w-full bg-black border border-neutral-800 rounded px-3 py-2 text-white tracking-widest focus:outline-none focus:border-white"
+                placeholder="eSIM / SIM 2"
+                className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-white tracking-widest font-mono focus:outline-none focus:border-zinc-500 transition"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Serial Number (Optional)</label>
+              <label className="block text-zinc-400 mb-1.5 font-medium">Serial Number (Optional)</label>
               <input
                 type="text"
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
                 placeholder="e.g. F2LLN0G9XXXX"
-                className="w-full bg-black border border-neutral-800 rounded px-3 py-2 text-white uppercase focus:outline-none focus:border-white"
+                className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-white uppercase font-mono focus:outline-none focus:border-zinc-500 transition"
               />
             </div>
           </div>
 
-          {/* Receipt Proof Upload (Cloudinary / Supabase placeholder) */}
-          <div className="border border-dashed border-neutral-800 rounded-lg p-3 text-center bg-black">
-            <Upload className="w-5 h-5 mx-auto text-neutral-500 mb-1" />
-            <span className="text-[11px] text-neutral-400 block">
-              {receiptFileName ? receiptFileName : "Upload Purchase Invoice / Receipt Proof"}
-            </span>
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              id="receipt-file"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) setReceiptFileName(file.name);
-              }}
-            />
-            <label
-              htmlFor="receipt-file"
-              className="mt-2 inline-block text-[10px] text-black bg-white px-3 py-1 rounded cursor-pointer hover:bg-neutral-200 transition"
-            >
-              Browse Proof
-            </label>
+          {/* Cloudinary / Storage Receipt Upload */}
+          <div className="border border-dashed border-zinc-800 rounded-2xl p-4 text-center bg-zinc-900/40 hover:bg-zinc-900/60 transition">
+            {isUploading ? (
+              <div className="flex flex-col items-center gap-1.5 py-2">
+                <RefreshCw className="w-5 h-5 text-zinc-400 animate-spin" />
+                <span className="text-[11px] text-zinc-400">Uploading invoice proof to secure storage...</span>
+              </div>
+            ) : receiptUrl ? (
+              <div className="flex items-center justify-center gap-2 text-emerald-400 py-1">
+                <FileCheck className="w-5 h-5" />
+                <span className="text-xs font-medium truncate max-w-xs">{receiptFileName}</span>
+              </div>
+            ) : (
+              <>
+                <Upload className="w-6 h-6 mx-auto text-zinc-500 mb-1.5" />
+                <span className="text-xs text-zinc-300 block font-medium">
+                  Upload Purchase Invoice or Store Receipt
+                </span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                  PNG, JPG, or PDF up to 10MB
+                </span>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  id="receipt-file-input"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+                <label
+                  htmlFor="receipt-file-input"
+                  className="mt-2.5 inline-block text-xs text-zinc-950 bg-white font-medium px-4 py-1.5 rounded-full cursor-pointer hover:bg-zinc-200 transition shadow"
+                >
+                  Choose File
+                </label>
+              </>
+            )}
           </div>
 
-          <div className="pt-2 flex gap-2">
+          <div className="pt-2 flex gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-neutral-900 border border-neutral-800 text-neutral-300 py-2.5 rounded hover:bg-neutral-800 transition"
+              className="flex-1 glass-pill text-zinc-300 py-3 rounded-xl hover:bg-zinc-800 transition"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || imeiPrimary.length !== 15}
-              className="flex-1 bg-white text-black font-semibold py-2.5 rounded hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-500 transition flex items-center justify-center gap-1.5"
+              disabled={isSubmitting || imeiPrimary.length !== 15 || isUploading}
+              className="flex-1 bg-white hover:bg-zinc-200 text-zinc-950 font-semibold py-3 rounded-xl disabled:bg-zinc-800 disabled:text-zinc-500 transition shadow-lg flex items-center justify-center gap-1.5"
             >
               {isSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Issue Digital Deed"}
             </button>

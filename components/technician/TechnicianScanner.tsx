@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
+  Camera, 
   CameraOff, 
   Search, 
   ShieldCheck, 
@@ -10,7 +11,13 @@ import {
   RefreshCw, 
   Clock, 
   Printer, 
-  Sparkles
+  Sparkles,
+  Zap,
+  ZapOff,
+  SwitchCamera,
+  ZoomIn,
+  Sliders,
+  Maximize2
 } from "lucide-react";
 import { validateImeiLuhn } from "@/lib/utils/luhn";
 import { formatImei } from "@/lib/utils/formatters";
@@ -35,29 +42,76 @@ export default function TechnicianScanner() {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [protocolActionTaken, setProtocolActionTaken] = useState<string | null>(null);
 
+  // Workshop Camera Hardware Controls
+  const [torchSupported, setTorchSupported] = useState<boolean>(false);
+  const [isTorchOn, setIsTorchOn] = useState<boolean>(false);
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
+  const [zoomSupported, setZoomSupported] = useState<boolean>(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [maxZoom, setMaxZoom] = useState<number>(3);
+
   // Quick test helpers
   const setDemoStolen = () => setManualImei("862345041234568");
   const setDemoClean = () => setManualImei("358742091234567");
 
-  // Camera Management
-  const startCamera = async () => {
+  // Enumerate available video inputs
+  const fetchCameras = useCallback(async () => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.mediaDevices?.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter((d) => d.kind === "videoinput");
+        setAvailableCameras(videoInputs);
+        if (videoInputs.length > 0 && !selectedCameraId) {
+          // Prefer environment back camera
+          const backCam = videoInputs.find(c => c.label.toLowerCase().includes("back") || c.label.toLowerCase().includes("environment"));
+          setSelectedCameraId(backCam ? backCam.deviceId : videoInputs[0].deviceId);
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  }, [selectedCameraId]);
+
+  useEffect(() => {
+    fetchCameras();
+  }, [fetchCameras]);
+
+  // Start Camera with selected device & capabilities
+  const startCamera = async (deviceId?: string) => {
     try {
       setErrorMsg(null);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      });
+      stopCamera();
+
+      const constraints: MediaStreamConstraints = {
+        video: deviceId 
+          ? { deviceId: { exact: deviceId } }
+          : { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         setCameraActive(true);
+
+        // Inspect Track Capabilities (Torch & Zoom)
+        const track = stream.getVideoTracks()[0];
+        if (track) {
+          const capabilities: any = track.getCapabilities ? track.getCapabilities() : {};
+          if (capabilities.torch) {
+            setTorchSupported(true);
+          }
+          if (capabilities.zoom) {
+            setZoomSupported(true);
+            setMaxZoom(capabilities.zoom.max || 3);
+            setZoomLevel(capabilities.zoom.min || 1);
+          }
+        }
       }
     } catch (err: any) {
-      console.warn("Camera access failed or unavailable:", err);
-      setErrorMsg("Camera sensor unavailable. You can use manual IMEI entry below.");
+      console.warn("Camera sensor initialization:", err);
+      setErrorMsg("Optical sensor unavailable. Use manual IMEI verification below.");
       setCameraActive(false);
     }
   };
@@ -68,14 +122,60 @@ export default function TechnicianScanner() {
       stream.getTracks().forEach((track) => track.stop());
       videoRef.current.srcObject = null;
       setCameraActive(false);
+      setIsTorchOn(false);
     }
+  };
+
+  // Toggle Hardware Torch (Bench Light)
+  const toggleTorch = async () => {
+    if (!videoRef.current?.srcObject) return;
+    const stream = videoRef.current.srcObject as MediaStream;
+    const track = stream.getVideoTracks()[0];
+    if (track && torchSupported) {
+      try {
+        const nextState = !isTorchOn;
+        await (track as any).applyConstraints({
+          advanced: [{ torch: nextState }]
+        });
+        setIsTorchOn(nextState);
+      } catch (err) {
+        console.warn("Torch constraint failed:", err);
+      }
+    }
+  };
+
+  // Adjust Digital Hardware Zoom
+  const handleZoomChange = async (newZoom: number) => {
+    setZoomLevel(newZoom);
+    if (!videoRef.current?.srcObject) return;
+    const stream = videoRef.current.srcObject as MediaStream;
+    const track = stream.getVideoTracks()[0];
+    if (track && zoomSupported) {
+      try {
+        await (track as any).applyConstraints({
+          advanced: [{ zoom: newZoom }]
+        });
+      } catch {
+        // Zoom clamp fallback
+      }
+    }
+  };
+
+  // Cycle Next Camera / Lens
+  const switchNextCamera = () => {
+    if (availableCameras.length < 2) return;
+    const currentIndex = availableCameras.findIndex(c => c.deviceId === selectedCameraId);
+    const nextIndex = (currentIndex + 1) % availableCameras.length;
+    const nextCamId = availableCameras[nextIndex].deviceId;
+    setSelectedCameraId(nextCamId);
+    startCamera(nextCamId);
   };
 
   // Execution of Silent Scan
   const executeVerification = useCallback(async (imeiToVerify: string) => {
     const cleaned = imeiToVerify.replace(/[^0-9A-Za-z]/g, "");
     if (cleaned.length < 8) {
-      setErrorMsg("Identifier too short for database lookup.");
+      setErrorMsg("Identifier too short for database query.");
       return;
     }
 
@@ -83,7 +183,7 @@ export default function TechnicianScanner() {
     setErrorMsg(null);
     setProtocolActionTaken(null);
 
-    // Grab GPS silently without customer alert
+    // Silent background GPS grab
     let coordinates: { lat: number | null; lng: number | null } = { lat: null, lng: null };
     if (typeof window !== "undefined" && "geolocation" in navigator) {
       try {
@@ -98,7 +198,7 @@ export default function TechnicianScanner() {
           lng: position.coords.longitude,
         };
       } catch {
-        // Continue silently if GPS is denied or unavailable
+        // Continue silently without blocking if GPS is denied
       }
     }
 
@@ -127,6 +227,11 @@ export default function TechnicianScanner() {
         scannedAt: data.scanned_at,
         imei: cleaned,
       });
+
+      // Subtle haptic feedback on clean verification; pure silent stealth on stolen
+      if (data.status === "VERIFIED_CLEAN" && typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate(50);
+      }
 
       stopCamera();
     } catch (err: any) {
@@ -166,7 +271,7 @@ export default function TechnicianScanner() {
             }
           }
         } catch {
-          // Ignore detector frame skip
+          // Frame skip
         } finally {
           isDetecting = false;
         }
@@ -189,7 +294,6 @@ export default function TechnicianScanner() {
     return () => stopCamera();
   }, []);
 
-  // Action Dispatcher for Deceptive Diagnostic State
   const handleProtocolAction = async (action: "INTAKE_HOLD" | "SERVICE_DECLINED") => {
     if (!scanResult) return;
     try {
@@ -203,7 +307,7 @@ export default function TechnicianScanner() {
       });
       setProtocolActionTaken(action);
     } catch (err) {
-      console.error("Failed to log protocol action:", err);
+      console.error("Protocol action log failed:", err);
       setProtocolActionTaken(action);
     }
   };
@@ -213,36 +317,37 @@ export default function TechnicianScanner() {
     setManualImei("");
     setProtocolActionTaken(null);
     setErrorMsg(null);
+    startCamera(selectedCameraId);
   };
 
   return (
-    <div className="w-full max-w-xl mx-auto p-4 bg-black text-white min-h-[calc(100vh-3.5rem)] font-mono flex flex-col justify-between">
-      {/* Top Header */}
-      <div>
-        <header className="border-b border-neutral-800 pb-3 mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
-            <span className="text-xs uppercase tracking-widest text-neutral-300 font-semibold">
-              RupalShield // Intake Terminal
+    <div className="w-full max-w-xl mx-auto px-2 py-4 text-zinc-100 flex flex-col justify-between">
+      {/* Top Header Card */}
+      <div className="space-y-4">
+        <header className="glass-panel rounded-2xl p-3.5 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-2.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400/50" />
+            <span className="text-xs uppercase tracking-wider text-zinc-200 font-semibold font-mono">
+              Intake Scanner // Workshop Mode
             </span>
           </div>
-          <span className="text-[10px] text-neutral-400 border border-neutral-800 px-2 py-0.5 rounded">
+          <span className="text-[10px] text-zinc-400 glass-pill px-2.5 py-1 rounded-full font-mono">
             SILENT SHIELD ENGAGED
           </span>
         </header>
 
         {/* Error Alert */}
         {errorMsg && (
-          <div className="bg-neutral-950 border border-neutral-800 text-neutral-300 text-xs p-3 rounded mb-4 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-white shrink-0" />
+          <div className="glass-panel rounded-2xl border-amber-500/30 text-amber-200 text-xs p-3.5 flex items-center gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
 
-        {/* Viewfinder Area */}
+        {/* Viewfinder Viewport */}
         {!scanResult && (
-          <div className="flex flex-col gap-4">
-            <div className="relative aspect-[4/3] w-full bg-neutral-950 border border-neutral-800 rounded-lg overflow-hidden flex items-center justify-center">
+          <div className="space-y-4">
+            <div className="relative aspect-[4/3] w-full bg-zinc-950/90 rounded-3xl border border-zinc-800/80 overflow-hidden flex items-center justify-center shadow-2xl">
               <video
                 ref={videoRef}
                 playsInline
@@ -252,56 +357,100 @@ export default function TechnicianScanner() {
 
               {/* Viewfinder Reticle Overlay */}
               {cameraActive && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="w-3/4 h-24 border border-white/40 rounded relative">
-                    <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-white" />
-                    <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-white" />
-                    <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-white" />
-                    <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-white" />
-                    <div className="w-full h-0.5 bg-white/60 shadow-[0_0_8px_rgba(255,255,255,0.8)] absolute top-1/2 -translate-y-1/2 animate-bounce" />
+                <>
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="w-3/4 h-28 border border-white/30 rounded-2xl relative shadow-inner">
+                      <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-white rounded-tl-md" />
+                      <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-white rounded-tr-md" />
+                      <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-white rounded-bl-md" />
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-white rounded-br-md" />
+                      <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_rgba(52,211,153,0.8)] absolute top-1/2 -translate-y-1/2 animate-pulse" />
+                    </div>
+                    <div className="absolute bottom-4 text-[10px] text-zinc-300 font-mono tracking-widest glass-pill px-3 py-1 rounded-full uppercase">
+                      Align Barcode or IMEI Label
+                    </div>
                   </div>
-                  <div className="absolute bottom-3 text-[10px] text-neutral-400 tracking-wider bg-black/80 px-2 py-0.5 rounded">
-                    ALIGN BARCODE / IMEI LABEL
+
+                  {/* Top Floating Workshop Camera Controls */}
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+                    {/* Torch Toggle */}
+                    <button
+                      onClick={toggleTorch}
+                      className={`p-2 rounded-xl glass-pill transition-all ${
+                        isTorchOn ? "bg-amber-400 text-black shadow-lg shadow-amber-400/30" : "text-zinc-300 hover:text-white"
+                      }`}
+                      title={isTorchOn ? "Turn Bench Light Off" : "Turn Bench Light On"}
+                    >
+                      {isTorchOn ? <Zap className="w-4 h-4 fill-black" /> : <ZapOff className="w-4 h-4" />}
+                    </button>
+
+                    {/* Camera Lens Switcher */}
+                    {availableCameras.length > 1 && (
+                      <button
+                        onClick={switchNextCamera}
+                        className="p-2 rounded-xl glass-pill text-zinc-300 hover:text-white transition-all"
+                        title="Switch Camera Lens"
+                      >
+                        <SwitchCamera className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
-                </div>
+
+                  {/* Bottom Floating Zoom Slider */}
+                  {zoomSupported && maxZoom > 1 && (
+                    <div className="absolute bottom-12 left-1/2 -translate-x-1/2 glass-panel rounded-full px-4 py-1.5 flex items-center gap-2 z-10">
+                      <ZoomIn className="w-3 h-3 text-zinc-400" />
+                      <input
+                        type="range"
+                        min="1"
+                        max={maxZoom}
+                        step="0.1"
+                        value={zoomLevel}
+                        onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
+                        className="w-24 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-white"
+                      />
+                      <span className="text-[10px] font-mono text-zinc-300">{zoomLevel.toFixed(1)}x</span>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Camera Offline Placeholder */}
               {!cameraActive && (
-                <div className="flex flex-col items-center gap-2 text-neutral-500 p-6 text-center">
-                  <CameraOff className="w-8 h-8 stroke-1 text-neutral-600" />
-                  <span className="text-xs">Optical Sensor Standby</span>
+                <div className="flex flex-col items-center gap-2 text-zinc-500 p-6 text-center">
+                  <CameraOff className="w-9 h-9 stroke-1 text-zinc-600 mb-1" />
+                  <span className="text-xs text-zinc-400">Optical Bench Sensor Standby</span>
                   <button
-                    onClick={startCamera}
-                    className="mt-2 text-xs bg-white text-black font-sans font-medium px-4 py-2 rounded hover:bg-neutral-200 transition"
+                    onClick={() => startCamera(selectedCameraId)}
+                    className="mt-3 text-xs bg-white text-zinc-950 font-medium px-5 py-2.5 rounded-full hover:bg-zinc-200 transition-all shadow-lg shadow-white/10"
                   >
-                    Activate Camera Stream
+                    Engage Camera Sensor
                   </button>
                 </div>
               )}
             </div>
 
             {/* Manual IMEI Input with Luhn Check */}
-            <div className="border border-neutral-800 bg-neutral-950 p-4 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-[11px] uppercase tracking-wider text-neutral-400">
+            <div className="glass-panel rounded-2xl p-4 space-y-3 shadow-xl">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-zinc-300">
                   Manual IMEI / Serial Lookup
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 font-mono text-[10px]">
                   <button
                     onClick={setDemoStolen}
-                    className="text-[10px] text-neutral-400 hover:text-white underline"
+                    className="text-zinc-400 hover:text-white underline transition"
                     title="Load mock stolen IMEI for testing"
                   >
-                    Load Stolen Demo
+                    Stolen Demo
                   </button>
-                  <span className="text-neutral-700">|</span>
+                  <span className="text-zinc-700">|</span>
                   <button
                     onClick={setDemoClean}
-                    className="text-[10px] text-neutral-400 hover:text-white underline"
+                    className="text-zinc-400 hover:text-white underline transition"
                     title="Load mock clean IMEI for testing"
                   >
-                    Load Clean Demo
+                    Clean Demo
                   </button>
                 </div>
               </div>
@@ -312,13 +461,13 @@ export default function TechnicianScanner() {
                   maxLength={16}
                   value={manualImei}
                   onChange={(e) => setManualImei(e.target.value.replace(/[^0-9]/g, ""))}
-                  placeholder="15-digit IMEI"
-                  className="flex-1 bg-black border border-neutral-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white font-mono tracking-widest placeholder:text-neutral-600"
+                  placeholder="Enter 15-digit IMEI"
+                  className="flex-1 bg-zinc-900/90 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-500 font-mono tracking-widest placeholder:text-zinc-600 transition"
                 />
                 <button
                   disabled={isProcessing || manualImei.length < 8}
                   onClick={() => executeVerification(manualImei)}
-                  className="bg-white text-black disabled:bg-neutral-800 disabled:text-neutral-500 font-sans text-xs font-semibold px-4 py-2 rounded flex items-center gap-1.5 transition"
+                  className="bg-white hover:bg-zinc-200 text-zinc-950 disabled:bg-zinc-800 disabled:text-zinc-500 text-xs font-semibold px-5 py-2.5 rounded-xl flex items-center gap-1.5 transition-all shadow-md"
                 >
                   {isProcessing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
                   Verify
@@ -327,14 +476,14 @@ export default function TechnicianScanner() {
 
               {/* Live Luhn Integrity Feedback */}
               {manualImei.length === 15 && (
-                <div className="mt-2 text-[11px] flex items-center gap-1.5">
+                <div className="text-[11px] flex items-center gap-1.5 pt-0.5">
                   {validateImeiLuhn(manualImei) ? (
-                    <span className="text-neutral-300 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-white" /> Valid Luhn Checksum (Mod 10 Verified)
+                    <span className="text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Valid 15-digit Luhn Checksum
                     </span>
                   ) : (
-                    <span className="text-neutral-400 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 text-neutral-400" /> Invalid IMEI Checksum (Luhn Mismatch)
+                    <span className="text-zinc-400 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 text-zinc-500" /> Invalid Checksum (Mod 10 Mismatch)
                     </span>
                   )}
                 </div>
@@ -343,13 +492,11 @@ export default function TechnicianScanner() {
           </div>
         )}
 
-        {/* ------------------------------------------------------------- */}
-        {/* RESULT VIEWS                                                  */}
-        {/* ------------------------------------------------------------- */}
+        {/* RESULT VIEWS */}
 
-        {/* 1. STEALTH SAFETY PROTOCOL (TRIGGERED WHEN STOLEN) */}
+        {/* 1. STEALTH SAFETY PROTOCOL (TRIGGERED ON STOLEN) */}
         {scanResult && scanResult.status === "FLAGGED_STOLEN" && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
             <DeceptiveDiagnosticCard
               brand={scanResult.brand}
               model={scanResult.model}
@@ -362,7 +509,7 @@ export default function TechnicianScanner() {
             {protocolActionTaken && (
               <button
                 onClick={resetScanner}
-                className="w-full text-xs bg-white text-black font-sans font-medium py-2 rounded hover:bg-neutral-200 transition"
+                className="w-full text-xs bg-white text-zinc-950 font-medium py-3 rounded-xl hover:bg-zinc-200 transition shadow-lg"
               >
                 Scan Next Device
               </button>
@@ -372,49 +519,51 @@ export default function TechnicianScanner() {
 
         {/* 2. VERIFIED CLEAN STATE */}
         {scanResult && scanResult.status === "VERIFIED_CLEAN" && (
-          <div className="border border-neutral-800 bg-neutral-950 p-5 rounded-lg flex flex-col gap-4">
-            <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
-              <ShieldCheck className="w-5 h-5 text-white" />
+          <div className="glass-panel rounded-2xl p-5 space-y-4 shadow-2xl animate-in fade-in">
+            <div className="flex items-center gap-3 border-b border-zinc-800/80 pb-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              </div>
               <div>
-                <h3 className="text-xs font-semibold text-white uppercase tracking-wider">
-                  Verified Clean Ownership
+                <h3 className="text-sm font-semibold text-white">
+                  Verified Clean Title
                 </h3>
-                <p className="text-[11px] text-neutral-400">Clear title confirmed in national registry.</p>
+                <p className="text-xs text-zinc-400">Recorded ownership confirmed in national registry.</p>
               </div>
             </div>
 
-            <div className="bg-black border border-neutral-900 p-3.5 rounded text-xs space-y-1.5 text-neutral-400">
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 text-xs space-y-2 text-zinc-400">
               <div className="flex justify-between">
-                <span>Device:</span>
+                <span>Hardware:</span>
                 <span className="text-white font-medium">{scanResult.brand} {scanResult.model}</span>
               </div>
               <div className="flex justify-between">
                 <span>IMEI Primary:</span>
-                <span className="text-neutral-200">{formatImei(scanResult.imei)}</span>
+                <span className="text-zinc-200 font-mono">{formatImei(scanResult.imei)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Status:</span>
-                <span className="text-white font-semibold flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-white" /> CLEAN_TITLE
+                <span>Title Status:</span>
+                <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-emerald-400" /> CLEAR_TITLE
                 </span>
               </div>
-              <div className="flex justify-between pt-1 border-t border-neutral-900 text-[10px]">
+              <div className="flex justify-between pt-1 border-t border-zinc-800/60 text-[10px]">
                 <span>Audit Token:</span>
-                <span className="font-mono text-neutral-400">{scanResult.cleanHandsToken.slice(0, 16)}...</span>
+                <span className="font-mono text-zinc-500">{scanResult.cleanHandsToken.slice(0, 16)}...</span>
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-1">
               <button
-                onClick={() => alert(`Intake Claim Ticket Generated:\nDevice: ${scanResult.brand} ${scanResult.model}\nIMEI: ${scanResult.imei}\nToken: ${scanResult.cleanHandsToken}`)}
-                className="flex-1 bg-white hover:bg-neutral-200 text-black text-xs font-sans font-semibold py-2.5 rounded flex items-center justify-center gap-1.5 transition"
+                onClick={() => alert(`Intake Claim Ticket:\nDevice: ${scanResult.brand} ${scanResult.model}\nIMEI: ${scanResult.imei}\nToken: ${scanResult.cleanHandsToken}`)}
+                className="flex-1 bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-semibold py-3 rounded-xl flex items-center justify-center gap-1.5 transition shadow"
               >
                 <Printer className="w-3.5 h-3.5" />
-                Generate Intake Claim Ticket
+                Generate Intake Ticket
               </button>
               <button
                 onClick={resetScanner}
-                className="bg-neutral-900 border border-neutral-700 text-neutral-300 text-xs px-3 rounded hover:bg-neutral-800"
+                className="glass-pill text-zinc-300 text-xs px-4 rounded-xl hover:bg-zinc-800 transition"
               >
                 New Scan
               </button>
@@ -424,42 +573,40 @@ export default function TechnicianScanner() {
 
         {/* 3. UNREGISTERED STATE */}
         {scanResult && scanResult.status === "UNREGISTERED" && (
-          <div className="border border-neutral-800 bg-neutral-950 p-5 rounded-lg flex flex-col gap-4">
-            <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
-              <Clock className="w-5 h-5 text-neutral-400" />
+          <div className="glass-panel rounded-2xl p-5 space-y-4 shadow-2xl animate-in fade-in">
+            <div className="flex items-center gap-3 border-b border-zinc-800/80 pb-3">
+              <div className="w-9 h-9 rounded-xl bg-zinc-800/60 border border-zinc-700/40 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-zinc-300" />
+              </div>
               <div>
-                <h3 className="text-xs font-semibold text-neutral-200 uppercase tracking-wider">
-                  Unregistered Device (Safe to Service)
+                <h3 className="text-sm font-semibold text-zinc-200">
+                  Unregistered Device
                 </h3>
-                <p className="text-[11px] text-neutral-400">No active theft record. Standard intake permitted.</p>
+                <p className="text-xs text-zinc-400">No active theft record. Safe for servicing.</p>
               </div>
             </div>
 
-            <div className="bg-black border border-neutral-900 p-3.5 rounded text-xs space-y-1.5 text-neutral-400">
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 text-xs space-y-2 text-zinc-400">
               <div className="flex justify-between">
                 <span>Searched Identifier:</span>
-                <span className="text-neutral-200 font-mono">{formatImei(scanResult.imei)}</span>
+                <span className="text-zinc-200 font-mono">{formatImei(scanResult.imei)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Registry Record:</span>
-                <span className="text-neutral-300">NOT_FOUND</span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-neutral-900 text-[10px]">
-                <span>Audit Token:</span>
-                <span className="font-mono text-neutral-400">{scanResult.cleanHandsToken.slice(0, 16)}...</span>
+                <span className="text-zinc-300">NOT_FOUND</span>
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-1">
               <button
                 onClick={() => alert(`Standard repair receipt generated for IMEI: ${scanResult.imei}`)}
-                className="flex-1 bg-white hover:bg-neutral-200 text-black text-xs font-sans font-semibold py-2.5 rounded transition"
+                className="flex-1 bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-semibold py-3 rounded-xl transition shadow"
               >
-                Issue Standard Intake Receipt
+                Issue Intake Receipt
               </button>
               <button
                 onClick={resetScanner}
-                className="bg-neutral-900 border border-neutral-700 text-neutral-300 text-xs px-3 rounded hover:bg-neutral-800"
+                className="glass-pill text-zinc-300 text-xs px-4 rounded-xl hover:bg-zinc-800 transition"
               >
                 Scan Next
               </button>
@@ -469,7 +616,7 @@ export default function TechnicianScanner() {
       </div>
 
       {/* Footer Status */}
-      <footer className="border-t border-neutral-900 pt-3 mt-6 text-[10px] text-neutral-500 flex justify-between">
+      <footer className="pt-6 text-[10px] text-zinc-500 font-mono flex justify-between">
         <span>ENCRYPTION: TLS 1.3 // SHA-256</span>
         <span>LATENCY: &lt; 35ms</span>
       </footer>

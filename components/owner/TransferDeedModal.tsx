@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, ArrowRightLeft, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { X, ArrowRightLeft, AlertCircle, RefreshCw } from "lucide-react";
 import { formatImei } from "@/lib/utils/formatters";
 
 interface TransferDeedModalProps {
@@ -61,36 +61,41 @@ export default function TransferDeedModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-xl p-6 font-mono text-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-neutral-800 pb-3 mb-4">
-          <div className="flex items-center gap-2">
-            <ArrowRightLeft className="w-4 h-4 text-white" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider">
-              Transfer Ownership Deed
-            </h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="w-full max-w-md glass-panel rounded-3xl p-6 sm:p-7 text-zinc-100 shadow-2xl border-zinc-700/60">
+        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-zinc-800 flex items-center justify-center">
+              <ArrowRightLeft className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold tracking-wide text-white">
+                Transfer Ownership Deed
+              </h2>
+              <span className="text-[11px] text-zinc-400">Cryptographic deed re-assignment</span>
+            </div>
           </div>
-          <button onClick={onClose} className="text-neutral-500 hover:text-white transition">
+          <button onClick={onClose} className="text-zinc-400 hover:text-white p-1.5 rounded-full hover:bg-zinc-800/60 transition">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {errorMsg && (
-          <div className="bg-neutral-900 border border-neutral-800 text-neutral-200 text-xs p-3 rounded mb-4 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-white shrink-0" />
+          <div className="glass-panel border-amber-500/30 text-amber-200 text-xs p-3 rounded-2xl mb-4 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
 
-        <div className="bg-black border border-neutral-800 p-3 rounded text-xs mb-4 space-y-1">
-          <div className="text-neutral-400">Target Device:</div>
-          <div className="text-white font-semibold">{device.brand} {device.model}</div>
-          <div className="text-neutral-400 font-mono text-[11px]">{formatImei(device.imei_primary)}</div>
+        <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 text-xs mb-4 space-y-1">
+          <div className="text-zinc-400 font-medium">Target Hardware:</div>
+          <div className="text-white font-semibold text-sm">{device.brand} {device.model}</div>
+          <div className="text-zinc-400 font-mono text-[11px]">{formatImei(device.imei_primary)}</div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="block text-[11px] text-neutral-400 mb-1">
+            <label className="block text-zinc-400 mb-1.5 font-medium">
               Recipient Email or Phone Number *
             </label>
             <input
@@ -99,37 +104,37 @@ export default function TransferDeedModal({
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
               placeholder="e.g. buyer@example.com or +1234567890"
-              className="w-full bg-black border border-neutral-800 rounded px-3 py-2 text-white focus:outline-none focus:border-white"
+              className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-zinc-500 transition"
             />
-            <span className="text-[10px] text-neutral-500 mt-1 block">
-              The recipient will receive a cryptographic deed claim token to complete handoff.
+            <span className="text-[10px] text-zinc-400 mt-1 block">
+              The recipient will receive an encrypted deed claim token to complete handoff.
             </span>
           </div>
 
-          <label className="flex items-start gap-2 bg-neutral-900/50 p-2.5 rounded border border-neutral-800 cursor-pointer">
+          <label className="flex items-start gap-2.5 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800 cursor-pointer hover:bg-zinc-900/70 transition">
             <input
               type="checkbox"
               checked={confirmTransfer}
               onChange={(e) => setConfirmTransfer(e.target.checked)}
-              className="mt-0.5 rounded border-neutral-700 bg-black text-white focus:ring-0"
+              className="mt-0.5 rounded border-zinc-700 bg-zinc-950 text-white focus:ring-0"
             />
-            <span className="text-[11px] text-neutral-300">
-              I certify that I am legitimately transferring ownership of this electronics hardware and will relinquish all registry claims.
+            <span className="text-[11px] text-zinc-300 leading-snug">
+              I certify that I am legitimately transferring legal title to this electronics hardware and will relinquish all registry claims.
             </span>
           </label>
 
-          <div className="pt-2 flex gap-2">
+          <div className="pt-2 flex gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-neutral-900 border border-neutral-800 text-neutral-300 py-2.5 rounded hover:bg-neutral-800 transition"
+              className="flex-1 glass-pill text-zinc-300 py-3 rounded-xl hover:bg-zinc-800 transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !recipient || !confirmTransfer}
-              className="flex-1 bg-white text-black font-semibold py-2.5 rounded hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-500 transition flex items-center justify-center gap-1.5"
+              className="flex-1 bg-white hover:bg-zinc-200 text-zinc-950 font-semibold py-3 rounded-xl disabled:bg-zinc-800 disabled:text-zinc-500 transition shadow-lg flex items-center justify-center gap-1.5"
             >
               {isSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Transfer Deed"}
             </button>

@@ -23,18 +23,18 @@ export default async function DeedPage({ params }: { params: Promise<{ id: strin
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-6 font-mono space-y-6">
+    <div className="max-w-2xl mx-auto py-6 space-y-6">
       <div className="no-print flex items-center justify-between">
         <Link
           href="/dashboard/devices"
-          className="text-xs text-neutral-400 hover:text-white flex items-center gap-1.5 transition"
+          className="glass-pill text-xs text-zinc-300 hover:text-white px-3.5 py-1.5 rounded-full flex items-center gap-1.5 transition"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           Back to Registry
         </Link>
       </div>
 
-      <div className="bg-white text-black p-8 rounded-xl border-4 border-black space-y-6 shadow-2xl">
+      <div className="bg-white text-black p-8 sm:p-10 rounded-3xl border-4 border-black space-y-6 font-mono shadow-2xl">
         <div className="border-b-2 border-black pb-4 flex justify-between items-start">
           <div>
             <div className="text-[10px] tracking-widest uppercase font-bold text-neutral-600">
@@ -48,7 +48,7 @@ export default async function DeedPage({ params }: { params: Promise<{ id: strin
             </p>
           </div>
           <div className="text-right">
-            <span className="border-2 border-black px-2 py-1 text-xs font-bold uppercase rounded">
+            <span className="border-2 border-black px-2.5 py-1 text-xs font-bold uppercase rounded-md">
               VERIFIED TITLE
             </span>
           </div>
@@ -73,13 +73,13 @@ export default async function DeedPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        <div className="border-l-4 border-black pl-4 py-1 text-xs text-neutral-700 space-y-1.5">
-          <p className="font-bold text-black uppercase">Title Declaration:</p>
+        <div className="border-l-4 border-black pl-4 py-1 text-xs text-neutral-700 space-y-1.5 font-sans">
+          <p className="font-bold text-black uppercase font-mono">Title Declaration:</p>
           <p>
             The bearer of this deed is registered in the RupalShield decentralized hub as the verified title holder.
             This certificate serves as prima facie proof of ownership in commercial transactions, police clearance, and warranty verification.
           </p>
-          <div className="text-[10px] text-neutral-500 pt-1">
+          <div className="text-[10px] text-neutral-500 pt-1 font-mono">
             ANCHOR TIMESTAMP: {formatDateTime(deedData.registered_at)}
           </div>
         </div>

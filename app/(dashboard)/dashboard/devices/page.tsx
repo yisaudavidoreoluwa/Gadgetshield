@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { 
   Plus, 
   Smartphone, 
-  ShieldAlert, 
   ShieldCheck, 
   FileText, 
   ArrowRightLeft, 
@@ -34,7 +33,6 @@ export interface DeviceItem {
   updated_at: string;
 }
 
-// Default preloaded mock devices so user can immediately interact
 const INITIAL_MOCK_DEVICES: DeviceItem[] = [
   {
     id: "dev-001",
@@ -75,7 +73,6 @@ export default function DevicesPage() {
     const theftTime = nextStatus === "STOLEN" ? new Date().toISOString() : undefined;
     const ref = nextStatus === "STOLEN" ? `RS-CRIME-${device.id.slice(0, 8).toUpperCase()}` : undefined;
 
-    // Update in local state
     const updated = devices.map((d) =>
       d.id === device.id
         ? { ...d, status: nextStatus, stolen_at: theftTime, theft_reference: ref }
@@ -83,7 +80,6 @@ export default function DevicesPage() {
     );
     setDevices(updated);
 
-    // If marked stolen, immediately trigger the police clearance docket modal
     if (nextStatus === "STOLEN") {
       setActiveDocketDevice({
         ...device,
@@ -116,22 +112,22 @@ export default function DevicesPage() {
   };
 
   return (
-    <div className="space-y-6 font-mono">
-      {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-neutral-800 pb-4">
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {/* Top Banner Card */}
+      <div className="glass-panel rounded-3xl p-6 sm:p-7 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xl border-zinc-700/60">
         <div>
-          <h1 className="text-xl font-bold uppercase tracking-tight text-white flex items-center gap-2">
-            <Smartphone className="w-5 h-5" />
+          <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2.5">
+            <Smartphone className="w-5 h-5 text-zinc-300" />
             Device Ownership Registry
           </h1>
-          <p className="text-xs text-neutral-400 mt-1">
+          <p className="text-xs text-zinc-400 mt-1">
             Cryptographically anchored hardware deeds & instant theft broadcast engine.
           </p>
         </div>
 
         <button
           onClick={() => setIsRegisterOpen(true)}
-          className="bg-white hover:bg-neutral-200 text-black text-xs font-semibold px-4 py-2.5 rounded flex items-center gap-1.5 transition"
+          className="bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-semibold px-5 py-2.5 rounded-full flex items-center gap-2 transition shadow-md"
         >
           <Plus className="w-4 h-4" />
           Register New Device
@@ -147,37 +143,37 @@ export default function DevicesPage() {
           return (
             <div
               key={device.id}
-              className={`p-5 rounded-xl border transition ${
+              className={`glass-panel rounded-3xl p-6 transition-all duration-200 border ${
                 isStolen
-                  ? "border-neutral-700 bg-neutral-950/80"
-                  : "border-neutral-800 bg-black hover:border-neutral-700"
+                  ? "border-amber-500/40 shadow-lg shadow-amber-500/5"
+                  : "border-zinc-800/80 hover:border-zinc-700"
               }`}
             >
               {/* Card Header */}
-              <div className="flex justify-between items-start mb-3">
+              <div className="flex justify-between items-start mb-4">
                 <div>
-                  <span className="text-[10px] text-neutral-500 uppercase tracking-widest block">
+                  <span className="text-[10px] text-zinc-400 uppercase tracking-widest block font-mono">
                     {device.brand}
                   </span>
-                  <h3 className="text-base font-bold text-white tracking-wide">
+                  <h3 className="text-base font-semibold text-white tracking-tight">
                     {device.model}
                   </h3>
                 </div>
 
-                {/* Status Badge */}
+                {/* Status Pill Badge */}
                 <div>
                   {isStolen ? (
-                    <span className="bg-white text-black text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3 text-black" />
+                    <span className="bg-amber-400/10 text-amber-300 border border-amber-400/30 text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase flex items-center gap-1.5 font-mono">
+                      <AlertTriangle className="w-3 h-3 text-amber-400" />
                       FLAGGED STOLEN
                     </span>
                   ) : isTransferred ? (
-                    <span className="bg-neutral-800 text-neutral-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase">
+                    <span className="bg-zinc-800 text-zinc-300 text-[10px] font-medium px-2.5 py-1 rounded-full uppercase font-mono">
                       TRANSFERRED
                     </span>
                   ) : (
-                    <span className="border border-neutral-700 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" />
+                    <span className="bg-emerald-400/10 text-emerald-300 border border-emerald-400/20 text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase flex items-center gap-1.5 font-mono">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
                       CLEAN DEED
                     </span>
                   )}
@@ -185,27 +181,27 @@ export default function DevicesPage() {
               </div>
 
               {/* Specs */}
-              <div className="bg-neutral-950 border border-neutral-900 rounded p-3 text-xs space-y-1 text-neutral-400 mb-4">
+              <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4 text-xs space-y-2 text-zinc-400 mb-5">
                 <div className="flex justify-between">
                   <span>Primary IMEI:</span>
-                  <span className="text-white font-mono">{formatImei(device.imei_primary)}</span>
+                  <span className="text-white font-mono tracking-wider">{formatImei(device.imei_primary)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Serial Number:</span>
-                  <span className="text-neutral-300 font-mono">{device.serial_number || "N/A"}</span>
+                  <span className="text-zinc-300 font-mono">{device.serial_number || "N/A"}</span>
                 </div>
-                <div className="flex justify-between text-[10px] pt-1 border-t border-neutral-900">
+                <div className="flex justify-between text-[10px] pt-1 border-t border-zinc-800/60">
                   <span>Registered:</span>
-                  <span className="text-neutral-500">{formatDateTime(device.created_at)}</span>
+                  <span className="text-zinc-400">{formatDateTime(device.created_at)}</span>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              <div className="flex items-center gap-2 pt-1 text-xs">
                 {/* View Deed */}
                 <Link
                   href={`/dashboard/devices/${device.id}/deed`}
-                  className="flex-1 bg-neutral-900 hover:bg-neutral-800 text-white text-center py-2 px-3 rounded border border-neutral-800 transition flex items-center justify-center gap-1.5"
+                  className="flex-1 glass-pill hover:bg-zinc-800 text-white text-center py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 font-medium"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   View Deed
@@ -215,7 +211,7 @@ export default function DevicesPage() {
                 {!isStolen && !isTransferred && (
                   <button
                     onClick={() => setActiveTransferDevice(device)}
-                    className="bg-neutral-900 hover:bg-neutral-800 text-neutral-300 py-2 px-3 rounded border border-neutral-800 transition"
+                    className="glass-pill hover:bg-zinc-800 text-zinc-300 py-2.5 px-3 rounded-xl transition"
                     title="Transfer Ownership Deed"
                   >
                     <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -226,7 +222,7 @@ export default function DevicesPage() {
                 {isStolen && (
                   <button
                     onClick={() => setActiveDocketDevice(device)}
-                    className="bg-white hover:bg-neutral-200 text-black py-2 px-3 rounded font-semibold transition flex items-center gap-1.5"
+                    className="bg-white hover:bg-zinc-200 text-zinc-950 py-2.5 px-3.5 rounded-xl font-semibold transition flex items-center gap-1.5 shadow"
                   >
                     <Printer className="w-3.5 h-3.5" />
                     Police Docket
@@ -237,10 +233,10 @@ export default function DevicesPage() {
                 {!isTransferred && (
                   <button
                     onClick={() => handleToggleStolen(device)}
-                    className={`text-xs py-2 px-3 rounded transition font-semibold flex items-center gap-1 ${
+                    className={`text-xs py-2.5 px-3.5 rounded-xl transition font-semibold flex items-center gap-1.5 ${
                       isStolen
-                        ? "bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-300"
-                        : "bg-white hover:bg-neutral-200 text-black"
+                        ? "glass-pill text-zinc-300 hover:bg-zinc-800"
+                        : "bg-white hover:bg-zinc-200 text-zinc-950 shadow"
                     }`}
                   >
                     {isStolen ? "Mark Recovered" : "Report Stolen"}
