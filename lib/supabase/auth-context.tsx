@@ -4,11 +4,21 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "./client";
 import { Profile, UserRole } from "@/lib/types/database";
 
+interface SignUpMetadata {
+  full_name: string;
+  role: UserRole;
+  shop_name?: string;
+  market_location?: string;
+}
+
 interface AuthContextType {
   user: any | null;
   profile: Profile | null;
   role: UserRole;
   isLoading: boolean;
+  isConfigured: boolean;
+  signInWithPassword: (email: string, password: string) => Promise<{ error: any | null }>;
+  signUpWithPassword: (email: string, password: string, metadata: SignUpMetadata) => Promise<{ error: any | null }>;
   signInWithOtp: (email: string, role?: UserRole) => Promise<{ error: any | null }>;
   signOut: () => Promise<void>;
   switchRole: (newRole: UserRole) => void;
@@ -18,101 +28,209 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any | null>(null);
-  const [profile, setProfile] = useState<Profile | null>({
-    id: "tech-001",
-    role: "technician",
-    full_name: "Master Technician (Demo)",
-    shop_name: "Apex Electronics Hub",
-    market_location: "Cluster Slot 14",
-    is_verified: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  });
-  const [role, setRole] = useState<UserRole>("technician");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [role, setRole] = useState<UserRole>("owner");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isConfigured, setIsConfigured] = useState<boolean>(true);
 
   const supabase = createClient();
 
+  // Inspect environment variables
   useEffect(() => {
-    // Check if live Supabase is connected
-    const checkUser = async () => {
-      try {
-        if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")) {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user) {
-            setUser(session.user);
-            const { data: profileData } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", session.user.id)
-              .single();
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || url.includes("placeholder") || !anonKey || anonKey.includes("placeholder")) {
+      setIsConfigured(false);
+    }
+  }, []);
 
-            if (profileData) {
-              setProfile(profileData);
-              setRole(profileData.role);
-            }
+  // Sync active Supabase session & fetch live profile
+  useEffect(() => {
+    const syncSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.warn("Session check error:", error.message);
+        }
+
+        if (session?.user) {
+          setUser(session.user);
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .single();
+
+          if (profileData) {
+            setProfile(profileData);
+            setRole(profileData.role);
+          } else {
+            // Fallback profile from user metadata if table row is pending trigger
+            const metaRole = (session.user.user_metadata?.role as UserRole) || "owner";
+            const fallbackProf: Profile = {
+              id: session.user.id,
+              role: metaRole,
+              full_name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User",
+              shop_name: session.user.user_metadata?.shop_name,
+              market_location: session.user.user_metadata?.market_location,
+              is_verified: false,
+              created_at: session.user.created_at,
+              updated_at: session.user.created_at,
+            };
+            setProfile(fallbackProf);
+            setRole(metaRole);
           }
+        } else {
+          setUser(null);
+          setProfile(null);
         }
       } catch (err) {
-        console.warn("Using local auth state:", err);
+        console.warn("Supabase auth check failed:", err);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    checkUser();
+    syncSession();
 
     // Listen to live auth changes
     try {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")) {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            const { data: profileData } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", session.user.id)
-              .single();
-            if (profileData) {
-              setProfile(profileData);
-              setRole(profileData.role);
-            }
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (session?.user) {
+          setUser(session.user);
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .single();
+
+          if (profileData) {
+            setProfile(profileData);
+            setRole(profileData.role);
           }
-        });
-        return () => subscription.unsubscribe();
-      }
+        } else {
+          setUser(null);
+          setProfile(null);
+        }
+        setIsLoading(false);
+      });
+
+      return () => subscription.unsubscribe();
     } catch {
-      // Offline fallback
+      setIsLoading(false);
     }
   }, [supabase]);
 
-  const signInWithOtp = async (email: string, targetRole: UserRole = "technician") => {
+  // Direct Email + Password Sign In
+  const signInWithPassword = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")) {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: {
-            data: { role: targetRole },
-            emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined,
-          },
-        });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
         setIsLoading(false);
         return { error };
-      } else {
-        // Mock demo immediate login
-        setRole(targetRole);
-        setUser({ id: "demo-user", email });
-        setProfile({
-          id: "demo-user",
-          role: targetRole,
-          full_name: email.split("@")[0].toUpperCase(),
-          is_verified: true,
+      }
+
+      setUser(data.user);
+      if (data.user) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
+          .single();
+
+        if (profileData) {
+          setProfile(profileData);
+          setRole(profileData.role);
+        }
+      }
+
+      setIsLoading(false);
+      return { error: null };
+    } catch (err: any) {
+      setIsLoading(false);
+      return { error: err };
+    }
+  };
+
+  // Direct Email + Password Sign Up
+  const signUpWithPassword = async (email: string, password: string, metadata: SignUpMetadata) => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: metadata.full_name,
+            role: metadata.role,
+            shop_name: metadata.shop_name || null,
+            market_location: metadata.market_location || null,
+          },
+        },
+      });
+
+      if (error) {
+        setIsLoading(false);
+        return { error };
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        // Create profile record if not auto-created by trigger
+        try {
+          await supabase.from("profiles").upsert({
+            id: data.user.id,
+            role: metadata.role,
+            full_name: metadata.full_name,
+            shop_name: metadata.shop_name || null,
+            market_location: metadata.market_location || null,
+            is_verified: false,
+          });
+        } catch {
+          // Trigger fallback
+        }
+
+        const newProfile: Profile = {
+          id: data.user.id,
+          role: metadata.role,
+          full_name: metadata.full_name,
+          shop_name: metadata.shop_name,
+          market_location: metadata.market_location,
+          is_verified: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        });
-        setIsLoading(false);
-        return { error: null };
+        };
+        setProfile(newProfile);
+        setRole(metadata.role);
       }
-    } catch (err) {
+
+      setIsLoading(false);
+      return { error: null };
+    } catch (err: any) {
+      setIsLoading(false);
+      return { error: err };
+    }
+  };
+
+  // Magic Link / OTP Sign In
+  const signInWithOtp = async (email: string, targetRole: UserRole = "owner") => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          data: { role: targetRole },
+          emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/dashboard/devices` : undefined,
+        },
+      });
+      setIsLoading(false);
+      return { error };
+    } catch (err: any) {
       setIsLoading(false);
       return { error: err };
     }
@@ -126,7 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(null);
     setProfile(null);
-    setRole("technician");
+    setRole("owner");
   };
 
   const switchRole = (newRole: UserRole) => {
@@ -143,6 +261,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         role,
         isLoading,
+        isConfigured,
+        signInWithPassword,
+        signUpWithPassword,
         signInWithOtp,
         signOut,
         switchRole,

@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+export async function GET(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ devices: [] });
+    }
+
+    const { data, error } = await supabase
+      .from("devices")
+      .select("*")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.warn("Error fetching user devices:", error.message);
+      return NextResponse.json({ devices: [] });
+    }
+
+    return NextResponse.json({ devices: data || [] });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || "Failed to load devices" }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -9,42 +35,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required device attributes" }, { status: 400 });
     }
 
-    // Try live Supabase insert
-    try {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")) {
-        const supabase = await createClient();
-        const { data, error } = await supabase.from("devices").insert({
-          brand: body.brand,
-          model: body.model,
-          imei_primary: body.imei_primary,
-          imei_secondary: body.imei_secondary || null,
-          serial_number: body.serial_number || null,
-          purchase_receipt_url: body.purchase_receipt_url || null,
-          status: "CLEAN",
-        }).select().single();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-        if (!error && data) {
-          return NextResponse.json(data);
-        }
-      }
-    } catch {
-      // Fall through to mock response
+    const ownerId = user?.id || body.owner_id;
+    if (!ownerId) {
+      return NextResponse.json({ error: "User authentication required to register device" }, { status: 401 });
     }
 
-    const newDevice = {
-      id: `dev-${Date.now()}`,
-      brand: body.brand,
-      model: body.model,
-      imei_primary: body.imei_primary,
-      imei_secondary: body.imei_secondary || null,
-      serial_number: body.serial_number || null,
+    // Live Supabase insert
+    const { data, error } = await supabase.from("devices").insert({
+      owner_id: ownerId,
+      brand: body.brand.trim(),
+      model: body.model.trim(),
+      imei_primary: body.imei_primary.trim(),
+      imei_secondary: body.imei_secondary ? body.imei_secondary.trim() : null,
+      serial_number: body.serial_number ? body.serial_number.trim() : null,
       purchase_receipt_url: body.purchase_receipt_url || null,
       status: "CLEAN",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    }).select().single();
 
-    return NextResponse.json(newDevice);
+    if (error) {
+      console.error("Supabase insert error:", error);
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json(data);
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to create device" }, { status: 500 });
   }
