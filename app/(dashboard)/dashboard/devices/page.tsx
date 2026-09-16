@@ -19,8 +19,23 @@ import StolenDocketModal from "@/components/owner/StolenDocketModal";
 import TransferDeedModal from "@/components/owner/TransferDeedModal";
 import { formatImei, formatDateTime } from "@/lib/utils/formatters";
 
+export interface DeviceItem {
+  id: string;
+  brand: string;
+  model: string;
+  imei_primary: string;
+  imei_secondary?: string;
+  serial_number?: string;
+  status: string;
+  stolen_at?: string;
+  theft_reference?: string;
+  purchase_receipt_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Default preloaded mock devices so user can immediately interact
-const INITIAL_MOCK_DEVICES = [
+const INITIAL_MOCK_DEVICES: DeviceItem[] = [
   {
     id: "dev-001",
     brand: "Apple",
@@ -48,7 +63,7 @@ const INITIAL_MOCK_DEVICES = [
 ];
 
 export default function DevicesPage() {
-  const [devices, setDevices] = useState(INITIAL_MOCK_DEVICES);
+  const [devices, setDevices] = useState<DeviceItem[]>(INITIAL_MOCK_DEVICES);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [activeDocketDevice, setActiveDocketDevice] = useState<any | null>(null);
   const [activeTransferDevice, setActiveTransferDevice] = useState<any | null>(null);
