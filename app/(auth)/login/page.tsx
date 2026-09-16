@@ -14,7 +14,7 @@ import {
   Mail,
   User,
   KeyRound,
-  ExternalLink
+  ArrowLeft
 } from "lucide-react";
 import { useAuth } from "@/lib/supabase/auth-context";
 
@@ -81,7 +81,6 @@ export default function LoginPage() {
         setErrorMessage(error.message || "Sign up failed. Please check your details.");
         setIsSubmitting(false);
       } else {
-        // Successful signup & login
         setIsSubmitting(false);
         if (selectedRole === "technician") {
           router.push("/technician/scan");
@@ -117,8 +116,8 @@ export default function LoginPage() {
             <span>Supabase Keys Missing on Vercel</span>
           </div>
           <p className="text-zinc-300 text-[11px] leading-relaxed">
-            Authentication requires <code className="bg-zinc-900 px-1 py-0.5 rounded font-mono text-white">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="bg-zinc-900 px-1 py-0.5 rounded font-mono text-white">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.
-            Add them in your <strong>Vercel Project &rarr; Settings &rarr; Environment Variables</strong>.
+            Authentication requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
+            Add them in your Vercel Project Settings under Environment Variables.
           </p>
         </div>
       )}
@@ -294,7 +293,7 @@ export default function LoginPage() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
+                    placeholder="Enter password (min 6 chars)"
                     className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl pl-10 pr-3.5 py-2.5 text-white focus:outline-none focus:border-zinc-500 transition"
                   />
                 </div>
@@ -326,9 +325,19 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setUseOtp(!useOtp)}
-                className="text-[11px] text-zinc-400 hover:text-zinc-200 transition"
+                className="text-[11px] text-zinc-400 hover:text-zinc-200 transition flex items-center justify-center gap-1 mx-auto"
               >
-                {useOtp ? "? Use Password instead" : "Use Email Magic Link / OTP instead ?"}
+                {useOtp ? (
+                  <>
+                    <ArrowLeft className="w-3 h-3" />
+                    <span>Use Password instead</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Use Email Magic Link / OTP instead</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </>
+                )}
               </button>
             </div>
           </form>
