@@ -63,7 +63,7 @@ const INITIAL_MOCK_DEVICES: DeviceItem[] = [
 ];
 
 export default function DevicesPage() {
-  const [devices, setDevices] = useState<DeviceItem[]>(INITIAL_MOCK_DEVICES);
+  const [devices, setDevices] = useState<any[]>(INITIAL_MOCK_DEVICES);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [activeDocketDevice, setActiveDocketDevice] = useState<any | null>(null);
   const [activeTransferDevice, setActiveTransferDevice] = useState<any | null>(null);
