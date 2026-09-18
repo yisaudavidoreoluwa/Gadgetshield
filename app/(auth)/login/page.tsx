@@ -13,7 +13,7 @@ import {
   Lock,
   Mail,
   User,
-  KeyRound,
+  Zap,
   ArrowLeft
 } from "lucide-react";
 import { useAuth } from "@/lib/supabase/auth-context";
@@ -24,10 +24,10 @@ export default function LoginPage() {
     signInWithPassword, 
     signUpWithPassword, 
     signInWithOtp, 
+    loginDemoUser,
     isConfigured 
   } = useAuth();
 
-  // Mode states: "signin" | "signup"
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [useOtp, setUseOtp] = useState<boolean>(false);
 
@@ -43,6 +43,16 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Instant Demo Login
+  const handleQuickDemo = (role: "owner" | "technician") => {
+    loginDemoUser(role);
+    if (role === "technician") {
+      router.push("/technician/scan");
+    } else {
+      router.push("/dashboard/devices");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +72,7 @@ export default function LoginPage() {
       return;
     }
 
-    // 2. Email + Password Sign Up
+    // 2. Sign Up Mode
     if (authMode === "signup") {
       if (password.length < 6) {
         setErrorMessage("Password must be at least 6 characters.");
@@ -91,7 +101,7 @@ export default function LoginPage() {
       return;
     }
 
-    // 3. Email + Password Sign In
+    // 3. Sign In Mode
     const { error } = await signInWithPassword(email, password);
     if (error) {
       setErrorMessage(error.message || "Invalid email or password.");
@@ -107,29 +117,45 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto py-12 px-4">
-      {/* Missing Supabase Env Diagnostic Warning */}
-      {!isConfigured && (
-        <div className="glass-panel border-amber-500/40 text-amber-200 text-xs p-4 rounded-3xl mb-5 space-y-1.5 shadow-xl">
-          <div className="flex items-center gap-2 font-semibold text-white">
-            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Supabase Keys Missing on Vercel</span>
-          </div>
-          <p className="text-zinc-300 text-[11px] leading-relaxed">
-            Authentication requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
-            Add them in your Vercel Project Settings under Environment Variables.
-          </p>
+    <div className="max-w-md mx-auto py-12 px-4 space-y-5">
+      {/* 1-Tap Quick Demo Access Pill */}
+      <div className="glass-panel rounded-3xl p-5 border-emerald-500/30 space-y-3 shadow-xl">
+        <div className="flex items-center gap-2 text-xs font-semibold text-white">
+          <Zap className="w-4 h-4 text-emerald-400" />
+          <span>One-Tap Instant Demo Access (No Signup Needed)</span>
         </div>
-      )}
+        <p className="text-[11px] text-zinc-400 leading-relaxed">
+          Test all features instantly with preloaded hardware deeds and verified shop status:
+        </p>
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => handleQuickDemo("technician")}
+            className="p-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 text-white text-xs font-medium flex items-center justify-center gap-2 transition hover:scale-[1.02]"
+          >
+            <Wrench className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Tech Hub Demo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickDemo("owner")}
+            className="p-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-sky-500/50 text-white text-xs font-medium flex items-center justify-center gap-2 transition hover:scale-[1.02]"
+          >
+            <Smartphone className="w-3.5 h-3.5 text-sky-400" />
+            <span>Owner Deeds Demo</span>
+          </button>
+        </div>
+      </div>
 
-      <div className="glass-panel rounded-3xl p-7 space-y-6 shadow-2xl border-zinc-700/60 animate-in fade-in zoom-in-95 duration-200">
+      {/* Main Auth Form Container */}
+      <div className="glass-panel rounded-3xl p-7 space-y-6 shadow-2xl border-zinc-700/60">
         {/* Header */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-1.5">
           <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-b from-zinc-100 to-zinc-300 text-zinc-950 flex items-center justify-center font-bold shadow-lg">
             <Shield className="w-6 h-6 fill-black stroke-black" />
           </div>
           <h1 className="text-lg font-semibold tracking-wide text-white">
-            {authMode === "signin" ? "Sign In to RupalShield" : "Create Defense Account"}
+            {authMode === "signin" ? "Sign In to RupalShield" : "Create Personal Account"}
           </h1>
           <p className="text-xs text-zinc-400">
             {authMode === "signin" 
@@ -176,9 +202,9 @@ export default function LoginPage() {
         {otpSent ? (
           <div className="glass-panel border-emerald-500/30 text-emerald-300 text-xs p-6 rounded-2xl text-center space-y-3">
             <CheckCircle2 className="w-9 h-9 text-emerald-400 mx-auto" />
-            <h3 className="text-sm font-semibold text-white">Magic Authentication Link Sent</h3>
+            <h3 className="text-sm font-semibold text-white">Authentication Link Dispatched</h3>
             <p className="text-zinc-400 text-xs leading-relaxed">
-              We sent a secure one-tap verification link to <strong className="text-white font-mono">{email}</strong>. Please check your inbox or spam folder.
+              We sent a secure sign-in link to <strong className="text-white font-mono">{email}</strong>.
             </p>
             <button
               onClick={() => setOtpSent(false)}

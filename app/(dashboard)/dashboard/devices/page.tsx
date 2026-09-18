@@ -21,67 +21,62 @@ import StolenDocketModal from "@/components/owner/StolenDocketModal";
 import TransferDeedModal from "@/components/owner/TransferDeedModal";
 import { formatImei, formatDateTime } from "@/lib/utils/formatters";
 import { useAuth } from "@/lib/supabase/auth-context";
-
-export interface DeviceItem {
-  id: string;
-  brand: string;
-  model: string;
-  imei_primary: string;
-  imei_secondary?: string;
-  serial_number?: string;
-  status: string;
-  stolen_at?: string;
-  theft_reference?: string;
-  purchase_receipt_url?: string;
-  created_at: string;
-  updated_at: string;
-}
+import { hybridStore } from "@/lib/storage/hybrid-store";
+import { Device } from "@/lib/types/database";
 
 export default function DevicesPage() {
-  const { user, isLoading: authLoading } = useAuth();
-  const [devices, setDevices] = useState<DeviceItem[]>([]);
+  const { user } = useAuth();
+  const [devices, setDevices] = useState<Device[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState<boolean>(true);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [activeDocketDevice, setActiveDocketDevice] = useState<any | null>(null);
   const [activeTransferDevice, setActiveTransferDevice] = useState<any | null>(null);
 
-  // Fetch live devices for authenticated user
-  const fetchUserDevices = useCallback(async () => {
+  // Load devices from hybrid store and sync with live server if available
+  const loadDevices = useCallback(() => {
     setIsLoadingDevices(true);
+    // 1. Instant load from local hybrid store
+    const local = hybridStore.getDevices();
+    setDevices(local);
+    setIsLoadingDevices(false);
+
+    // 2. Background attempt to query server
     try {
-      const res = await fetch("/api/devices");
-      if (res.ok) {
-        const data = await res.json();
-        setDevices(data.devices || []);
-      } else {
-        setDevices([]);
-      }
+      fetch("/api/devices")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.devices && data.devices.length > 0) {
+            setDevices(data.devices);
+          }
+        })
+        .catch(() => {});
     } catch {
-      setDevices([]);
-    } finally {
-      setIsLoadingDevices(false);
+      // Ignore background error
     }
   }, []);
 
   useEffect(() => {
-    fetchUserDevices();
-  }, [fetchUserDevices, user]);
+    loadDevices();
+  }, [loadDevices, user]);
 
   // One-Tap Stolen Toggle
-  const handleToggleStolen = async (device: DeviceItem) => {
+  const handleToggleStolen = (device: Device) => {
     const isCurrentlyStolen = device.status === "STOLEN";
     const nextStatus = isCurrentlyStolen ? "CLEAN" : "STOLEN";
     const theftTime = nextStatus === "STOLEN" ? new Date().toISOString() : undefined;
     const ref = nextStatus === "STOLEN" ? `RS-CRIME-${device.id.slice(0, 8).toUpperCase()}` : undefined;
 
-    // Optimistic UI update
-    const updated = devices.map((d) =>
-      d.id === device.id
-        ? { ...d, status: nextStatus, stolen_at: theftTime, theft_reference: ref }
-        : d
-    );
-    setDevices(updated);
+    // 1. Update in hybrid store
+    const updatedDev = hybridStore.updateDeviceStatus(device.id, nextStatus);
 
+    // 2. Update in React state
+    if (updatedDev) {
+      setDevices(devices.map((d) => (d.id === device.id ? updatedDev : d)));
+    } else {
+      setDevices(devices.map((d) => (d.id === device.id ? { ...d, status: nextStatus } : d)));
+    }
+
+    // 3. Open docket modal if stolen
     if (nextStatus === "STOLEN") {
       setActiveDocketDevice({
         ...device,
@@ -91,26 +86,28 @@ export default function DevicesPage() {
       });
     }
 
+    // 4. Background sync to server API
     try {
-      await fetch(`/api/devices/${device.id}/stolen`, {
+      fetch(`/api/devices/${device.id}/stolen`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
-      });
-    } catch (err) {
-      console.warn("Failed to sync stolen status:", err);
+      }).catch(() => {});
+    } catch {
+      // Ignore
     }
   };
 
-  const handleDeviceRegistered = (newDevice: DeviceItem) => {
+  const handleDeviceRegistered = (newDevice: Device) => {
     setDevices([newDevice, ...devices]);
   };
 
   const handleTransferred = (deviceId: string, recipient: string) => {
+    hybridStore.transferDevice(deviceId, recipient);
     setDevices(
-      devices.map((d) => (d.id === deviceId ? { ...d, status: "TRANSFERRED" } : d))
+      devices.map((d) => (d.id === deviceId ? { ...d, status: "TRANSFERRED" as const } : d))
     );
-    alert(`Ownership deed transferred to ${recipient}.`);
+    alert(`Ownership deed successfully transferred to ${recipient}.`);
   };
 
   return (
@@ -136,35 +133,14 @@ export default function DevicesPage() {
         </button>
       </div>
 
-      {/* Unauthenticated Alert State */}
-      {!authLoading && !user && (
-        <div className="glass-panel rounded-3xl p-6 border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-amber-400" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-white">Sign In Required to Anchor Ownership</h3>
-              <p className="text-xs text-zinc-400">Sign in to sync your verified gadget deeds to the national defense registry.</p>
-            </div>
-          </div>
-          <Link
-            href="/login"
-            className="bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold px-5 py-2.5 rounded-xl transition"
-          >
-            Sign In / Register
-          </Link>
-        </div>
-      )}
-
       {/* Loading Skeleton */}
       {isLoadingDevices ? (
         <div className="glass-panel rounded-3xl p-12 text-center flex flex-col items-center justify-center space-y-3">
           <RefreshCw className="w-6 h-6 text-zinc-400 animate-spin" />
-          <span className="text-xs text-zinc-400 font-mono">Querying database for verified deeds...</span>
+          <span className="text-xs text-zinc-400 font-mono">Loading hardware deeds...</span>
         </div>
       ) : devices.length === 0 ? (
-        /* ZERO-MOCK EMPTY STATE */
+        /* Empty State */
         <div className="glass-panel rounded-3xl p-12 sm:p-16 text-center flex flex-col items-center justify-center space-y-4 shadow-xl border-zinc-800/80">
           <div className="w-16 h-16 rounded-3xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-center shadow-inner">
             <Inbox className="w-8 h-8 text-zinc-500" />
@@ -172,7 +148,7 @@ export default function DevicesPage() {
           <div className="space-y-1.5 max-w-md">
             <h3 className="text-base font-semibold text-white">No Devices Registered Yet</h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              You do not have any gadgets anchored in the registry. Register your phone, tablet, or laptop to generate an immutable digital deed and gain one-tap police clearance protection.
+              Register your phone, tablet, or laptop to generate an immutable digital deed and gain one-tap police clearance protection.
             </p>
           </div>
           <button
@@ -236,6 +212,12 @@ export default function DevicesPage() {
                     <span>Primary IMEI:</span>
                     <span className="text-white font-mono tracking-wider">{formatImei(device.imei_primary)}</span>
                   </div>
+                  {device.imei_secondary && (
+                    <div className="flex justify-between">
+                      <span>Secondary IMEI:</span>
+                      <span className="text-zinc-300 font-mono">{formatImei(device.imei_secondary)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span>Serial Number:</span>
                     <span className="text-zinc-300 font-mono">{device.serial_number || "N/A"}</span>

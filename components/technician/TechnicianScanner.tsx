@@ -17,10 +17,13 @@ import {
   SwitchCamera,
   ZoomIn,
   Sliders,
-  Maximize2
+  Maximize2,
+  Upload,
+  ScanLine
 } from "lucide-react";
 import { validateImeiLuhn } from "@/lib/utils/luhn";
 import { formatImei } from "@/lib/utils/formatters";
+import { hybridStore } from "@/lib/storage/hybrid-store";
 import DeceptiveDiagnosticCard from "./DeceptiveDiagnosticCard";
 
 interface ScanResult {
@@ -35,12 +38,14 @@ interface ScanResult {
 
 export default function TechnicianScanner() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [cameraActive, setCameraActive] = useState<boolean>(false);
   const [manualImei, setManualImei] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [protocolActionTaken, setProtocolActionTaken] = useState<string | null>(null);
+  const [hasNativeBarcodeDetector, setHasNativeBarcodeDetector] = useState<boolean>(false);
 
   // Workshop Camera Hardware Controls
   const [torchSupported, setTorchSupported] = useState<boolean>(false);
@@ -54,6 +59,11 @@ export default function TechnicianScanner() {
   // Quick test helpers
   const setDemoStolen = () => setManualImei("862345041234568");
   const setDemoClean = () => setManualImei("358742091234567");
+  const setDemoUnregistered = () => setManualImei("352094081765433");
+
+  useEffect(() => {
+    setHasNativeBarcodeDetector(typeof window !== "undefined" && "BarcodeDetector" in window);
+  }, []);
 
   // Enumerate available video inputs
   const fetchCameras = useCallback(async () => {
@@ -111,7 +121,7 @@ export default function TechnicianScanner() {
       }
     } catch (err: any) {
       console.warn("Camera sensor initialization:", err);
-      setErrorMsg("Optical sensor unavailable. Use manual IMEI verification below.");
+      setErrorMsg("Optical sensor unavailable. Use photo upload or manual IMEI verification below.");
       setCameraActive(false);
     }
   };
@@ -183,6 +193,29 @@ export default function TechnicianScanner() {
     setErrorMsg(null);
     setProtocolActionTaken(null);
 
+    // 1. Instant check against local hybrid store (works offline, demo, and across sessions)
+    const localMatch = hybridStore.lookupDeviceByIdentifier(cleaned);
+    if (localMatch.status !== "UNREGISTERED" && localMatch.device) {
+      const cleanHandsToken = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ch-${Date.now()}`;
+      setScanResult({
+        status: localMatch.status,
+        matchedDeviceId: localMatch.device.id,
+        brand: localMatch.device.brand,
+        model: localMatch.device.model,
+        cleanHandsToken: cleanHandsToken,
+        scannedAt: new Date().toISOString(),
+        imei: cleaned,
+      });
+
+      if (localMatch.status === "VERIFIED_CLEAN" && typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+
+      stopCamera();
+      setIsProcessing(false);
+      return;
+    }
+
     // Silent background GPS grab
     let coordinates: { lat: number | null; lng: number | null } = { lat: null, lng: null };
     if (typeof window !== "undefined" && "geolocation" in navigator) {
@@ -235,13 +268,90 @@ export default function TechnicianScanner() {
 
       stopCamera();
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to complete device verification.");
+      console.warn("API query failed, applying fallback:", err);
+      // Fallback: If identifier is valid Luhn, show unregistered state rather than blocking
+      if (validateImeiLuhn(cleaned)) {
+        setScanResult({
+          status: "UNREGISTERED",
+          cleanHandsToken: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ch-${Date.now()}`,
+          scannedAt: new Date().toISOString(),
+          imei: cleaned,
+        });
+        stopCamera();
+      } else {
+        setErrorMsg(err.message || "Failed to complete device verification.");
+      }
     } finally {
       setIsProcessing(false);
     }
   }, []);
 
-  // Barcode Detection Loop
+  // Photo / Sticker Upload Handler (iOS Safari & Manual Photos)
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    setErrorMsg(null);
+
+    try {
+      if (typeof window !== "undefined" && "BarcodeDetector" in window) {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        await img.decode();
+        const barcodeDetector = new (window as any).BarcodeDetector({
+          formats: ["code_128", "code_39", "ean_13", "data_matrix", "qr_code"],
+        });
+        const barcodes = await barcodeDetector.detect(img);
+        URL.revokeObjectURL(img.src);
+        if (barcodes.length > 0) {
+          const raw = barcodes[0].rawValue;
+          const numericOnly = raw.replace(/[^0-9]/g, "");
+          if (numericOnly.length >= 8) {
+            await executeVerification(numericOnly);
+            return;
+          }
+        }
+      }
+      // If photo was taken but BarcodeDetector is unavailable or couldn't decode:
+      setErrorMsg("Image captured. Please confirm the 15-digit IMEI printed on the sticker below.");
+    } catch (err: any) {
+      setErrorMsg("Could not detect barcode from image. Please enter IMEI manually below.");
+    } finally {
+      setIsProcessing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // Immediate Frame Capture Snapshot
+  const captureAndAnalyzeFrame = async () => {
+    if (!videoRef.current) return;
+    setIsProcessing(true);
+    setErrorMsg(null);
+    try {
+      if (typeof window !== "undefined" && "BarcodeDetector" in window) {
+        const barcodeDetector = new (window as any).BarcodeDetector({
+          formats: ["code_128", "code_39", "ean_13", "data_matrix", "qr_code"],
+        });
+        const barcodes = await barcodeDetector.detect(videoRef.current);
+        if (barcodes.length > 0) {
+          const raw = barcodes[0].rawValue;
+          const numericOnly = raw.replace(/[^0-9]/g, "");
+          if (numericOnly.length >= 8) {
+            await executeVerification(numericOnly);
+            return;
+          }
+        }
+      }
+      setErrorMsg("No barcode detected in current frame. Center the IMEI sticker or use manual lookup.");
+    } catch {
+      setErrorMsg("Frame scan failed. Please type the IMEI manually below.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Continuous Native Barcode Detection Loop (Chrome, Android, Edge)
   useEffect(() => {
     let animationFrameId: number;
     let isDetecting = false;
@@ -322,6 +432,16 @@ export default function TechnicianScanner() {
 
   return (
     <div className="w-full max-w-xl mx-auto px-2 py-4 text-zinc-100 flex flex-col justify-between">
+      {/* Hidden File Input for iOS Safari Photo Snap & Upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handlePhotoUpload}
+      />
+
       {/* Top Header Card */}
       <div className="space-y-4">
         <header className="glass-panel rounded-2xl p-3.5 flex items-center justify-between shadow-lg">
@@ -367,7 +487,7 @@ export default function TechnicianScanner() {
                       <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_rgba(52,211,153,0.8)] absolute top-1/2 -translate-y-1/2 animate-pulse" />
                     </div>
                     <div className="absolute bottom-4 text-[10px] text-zinc-300 font-mono tracking-widest glass-pill px-3 py-1 rounded-full uppercase">
-                      Align Barcode or IMEI Label
+                      {hasNativeBarcodeDetector ? "Align Barcode or IMEI Label" : "Center Label & Tap Snapshot"}
                     </div>
                   </div>
 
@@ -396,6 +516,19 @@ export default function TechnicianScanner() {
                     )}
                   </div>
 
+                  {/* Capture Frame Snapshot Action (Useful for iOS Safari) */}
+                  <div className="absolute bottom-3 right-3 flex items-center gap-1.5 z-10">
+                    <button
+                      onClick={captureAndAnalyzeFrame}
+                      disabled={isProcessing}
+                      className="glass-pill text-[11px] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-zinc-800 transition"
+                      title="Analyze current video frame"
+                    >
+                      <ScanLine className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Snap Frame</span>
+                    </button>
+                  </div>
+
                   {/* Bottom Floating Zoom Slider */}
                   {zoomSupported && maxZoom > 1 && (
                     <div className="absolute bottom-12 left-1/2 -translate-x-1/2 glass-panel rounded-full px-4 py-1.5 flex items-center gap-2 z-10">
@@ -420,17 +553,27 @@ export default function TechnicianScanner() {
                 <div className="flex flex-col items-center gap-2 text-zinc-500 p-6 text-center">
                   <CameraOff className="w-9 h-9 stroke-1 text-zinc-600 mb-1" />
                   <span className="text-xs text-zinc-400">Optical Bench Sensor Standby</span>
-                  <button
-                    onClick={() => startCamera(selectedCameraId)}
-                    className="mt-3 text-xs bg-white text-zinc-950 font-medium px-5 py-2.5 rounded-full hover:bg-zinc-200 transition-all shadow-lg shadow-white/10"
-                  >
-                    Engage Camera Sensor
-                  </button>
+                  <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
+                    <button
+                      onClick={() => startCamera(selectedCameraId)}
+                      className="text-xs bg-white text-zinc-950 font-medium px-5 py-2.5 rounded-full hover:bg-zinc-200 transition-all shadow-lg shadow-white/10 flex items-center gap-1.5"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      Engage Camera Sensor
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs glass-pill text-zinc-200 font-medium px-4 py-2.5 rounded-full hover:bg-zinc-800 transition-all flex items-center gap-1.5"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-zinc-400" />
+                      Upload Sticker Photo
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Manual IMEI Input with Luhn Check */}
+            {/* Manual IMEI Input with Luhn Check & Quick Demos */}
             <div className="glass-panel rounded-2xl p-4 space-y-3 shadow-xl">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-medium text-zinc-300">
@@ -439,18 +582,26 @@ export default function TechnicianScanner() {
                 <div className="flex items-center gap-2 font-mono text-[10px]">
                   <button
                     onClick={setDemoStolen}
-                    className="text-zinc-400 hover:text-white underline transition"
-                    title="Load mock stolen IMEI for testing"
+                    className="text-amber-400 hover:text-amber-300 underline transition"
+                    title="Load mock stolen IMEI for testing stealth protocol"
                   >
                     Stolen Demo
                   </button>
                   <span className="text-zinc-700">|</span>
                   <button
                     onClick={setDemoClean}
-                    className="text-zinc-400 hover:text-white underline transition"
-                    title="Load mock clean IMEI for testing"
+                    className="text-emerald-400 hover:text-emerald-300 underline transition"
+                    title="Load mock clean IMEI for testing clean title"
                   >
                     Clean Demo
+                  </button>
+                  <span className="text-zinc-700">|</span>
+                  <button
+                    onClick={setDemoUnregistered}
+                    className="text-zinc-400 hover:text-white underline transition"
+                    title="Load mock unregistered IMEI"
+                  >
+                    Unregistered
                   </button>
                 </div>
               </div>
@@ -474,10 +625,10 @@ export default function TechnicianScanner() {
                 </button>
               </div>
 
-              {/* Live Luhn Integrity Feedback */}
-              {manualImei.length === 15 && (
-                <div className="text-[11px] flex items-center gap-1.5 pt-0.5">
-                  {validateImeiLuhn(manualImei) ? (
+              {/* Bottom Quick Action: Upload Sticker Photo */}
+              <div className="flex items-center justify-between pt-1 border-t border-zinc-800/60 text-[11px]">
+                {manualImei.length === 15 ? (
+                  validateImeiLuhn(manualImei) ? (
                     <span className="text-emerald-400 flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Valid 15-digit Luhn Checksum
                     </span>
@@ -485,9 +636,19 @@ export default function TechnicianScanner() {
                     <span className="text-zinc-400 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3 text-zinc-500" /> Invalid Checksum (Mod 10 Mismatch)
                     </span>
-                  )}
-                </div>
-              )}
+                  )
+                ) : (
+                  <span className="text-zinc-500 text-[10px]">Works offline and syncs with registered devices</span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-zinc-400 hover:text-white flex items-center gap-1 text-[10px] glass-pill px-2 py-1 rounded-md transition"
+                >
+                  <Upload className="w-2.5 h-2.5" /> Photo Upload
+                </button>
+              </div>
             </div>
           </div>
         )}
