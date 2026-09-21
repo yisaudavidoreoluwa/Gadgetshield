@@ -9,14 +9,14 @@ const STORAGE_KEYS = {
   VERIFICATION_LOGS: "rupalshield_verification_logs",
 };
 
-// Seed devices if local storage is empty
+// Seed devices if local storage is empty - configured with 100% valid Luhn IMEIs
 const DEFAULT_DEVICES: Device[] = [
   {
     id: "dev-seed-001",
     owner_id: "user-owner-001",
     brand: "Apple",
     model: "iPhone 15 Pro (Natural Titanium)",
-    imei_primary: "358742091234567",
+    imei_primary: "358742091234562",
     serial_number: "F2LLN0G9XXXX",
     status: "CLEAN",
     purchase_receipt_url: "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=600&auto=format&fit=crop&q=80",
@@ -28,7 +28,7 @@ const DEFAULT_DEVICES: Device[] = [
     owner_id: "user-owner-001",
     brand: "Samsung",
     model: "Galaxy S24 Ultra (Titanium Gray)",
-    imei_primary: "862345041234568",
+    imei_primary: "862345041234564",
     serial_number: "R5CW20XXXXX",
     status: "STOLEN",
     purchase_receipt_url: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=600&auto=format&fit=crop&q=80",
@@ -108,12 +108,12 @@ class HybridStore {
     if (!this.isBrowser()) return DEFAULT_DEVICES;
     const stored = localStorage.getItem(STORAGE_KEYS.DEVICES);
     if (!stored) {
-      // Initialize with seed devices so the app has test data right away
       localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(DEFAULT_DEVICES));
       return DEFAULT_DEVICES;
     }
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_DEVICES;
     } catch {
       return DEFAULT_DEVICES;
     }
@@ -168,6 +168,35 @@ class HybridStore {
     return true;
   }
 
+  mergeDevices(serverDevices: Device[]): Device[] {
+    const localDevices = this.getDevices();
+    const map = new Map<string, Device>();
+
+    // 1. Add server devices to map
+    for (const dev of serverDevices) {
+      if (dev && dev.id) map.set(dev.id, dev);
+    }
+
+    // 2. Add local devices, keeping local ones so newly registered items are never lost
+    for (const dev of localDevices) {
+      if (dev && dev.id) {
+        if (!map.has(dev.id)) {
+          map.set(dev.id, dev);
+        }
+      }
+    }
+
+    const merged = Array.from(map.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    if (this.isBrowser()) {
+      localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(merged));
+    }
+
+    return merged;
+  }
+
   // --- SCANNER IDENTIFIER LOOKUP ---
   lookupDeviceByIdentifier(identifier: string): { status: "VERIFIED_CLEAN" | "UNREGISTERED" | "FLAGGED_STOLEN"; device?: Device } {
     const cleaned = identifier.replace(/[^0-9A-Za-z]/g, "");
@@ -183,7 +212,7 @@ class HybridStore {
 
     if (!matched) {
       // Hardcoded fallback checks for demo
-      if (cleaned === "862345041234568") {
+      if (cleaned === "862345041234564" || cleaned === "862345041234568") {
         return {
           status: "FLAGGED_STOLEN",
           device: {
@@ -191,14 +220,14 @@ class HybridStore {
             owner_id: "owner-001",
             brand: "Samsung",
             model: "Galaxy S24 Ultra",
-            imei_primary: "862345041234568",
+            imei_primary: "862345041234564",
             status: "STOLEN",
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
         };
       }
-      if (cleaned === "358742091234567") {
+      if (cleaned === "358742091234562" || cleaned === "358742091234567") {
         return {
           status: "VERIFIED_CLEAN",
           device: {
@@ -206,7 +235,7 @@ class HybridStore {
             owner_id: "owner-001",
             brand: "Apple",
             model: "iPhone 15 Pro",
-            imei_primary: "358742091234567",
+            imei_primary: "358742091234562",
             status: "CLEAN",
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),

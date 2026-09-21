@@ -57,9 +57,9 @@ export default function TechnicianScanner() {
   const [maxZoom, setMaxZoom] = useState<number>(3);
 
   // Quick test helpers
-  const setDemoStolen = () => setManualImei("862345041234568");
-  const setDemoClean = () => setManualImei("358742091234567");
-  const setDemoUnregistered = () => setManualImei("352094081765433");
+  const setDemoStolen = () => setManualImei("862345041234564");
+  const setDemoClean = () => setManualImei("358742091234562");
+  const setDemoUnregistered = () => setManualImei("352094081765437");
 
   useEffect(() => {
     setHasNativeBarcodeDetector(typeof window !== "undefined" && "BarcodeDetector" in window);

@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Fallback for offline/demo tests
-    if (clean === "862345041234568" || clean.endsWith("999")) {
+    if (clean === "862345041234564" || clean === "862345041234568" || clean.endsWith("999")) {
       return NextResponse.json({
         status: "FLAGGED_STOLEN",
         matched_device_id: "demo-stolen",
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (clean === "358742091234567" || clean.endsWith("000")) {
+    if (clean === "358742091234562" || clean === "358742091234567" || clean.endsWith("000")) {
       return NextResponse.json({
         status: "VERIFIED_CLEAN",
         matched_device_id: "demo-clean",

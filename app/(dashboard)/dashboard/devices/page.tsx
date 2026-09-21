@@ -45,8 +45,9 @@ export default function DevicesPage() {
       fetch("/api/devices")
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (data?.devices && data.devices.length > 0) {
-            setDevices(data.devices);
+          if (data?.devices && Array.isArray(data.devices)) {
+            const merged = hybridStore.mergeDevices(data.devices);
+            setDevices(merged);
           }
         })
         .catch(() => {});
@@ -99,7 +100,8 @@ export default function DevicesPage() {
   };
 
   const handleDeviceRegistered = (newDevice: Device) => {
-    setDevices([newDevice, ...devices]);
+    const updated = hybridStore.getDevices();
+    setDevices(updated);
   };
 
   const handleTransferred = (deviceId: string, recipient: string) => {

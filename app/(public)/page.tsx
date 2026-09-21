@@ -29,7 +29,7 @@ import { validateImeiLuhn } from "@/lib/utils/luhn";
 
 export default function HomePage() {
   const [activeMockupTab, setActiveMockupTab] = useState<"scanner" | "dashboard" | "docket" | "verify">("scanner");
-  const [interactiveImei, setInteractiveImei] = useState("358742091234567");
+  const [interactiveImei, setInteractiveImei] = useState("358742091234562");
 
   return (
     <div className="text-zinc-100 overflow-hidden">
@@ -432,7 +432,7 @@ export default function HomePage() {
 
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-300 mb-3 flex items-center gap-2">
                   <Search className="w-3.5 h-3.5 text-zinc-500" />
-                  <span>358742091234567</span>
+                  <span>358742091234562</span>
                 </div>
 
                 <div className="glass-panel rounded-2xl p-4 space-y-3 border-emerald-500/30">

@@ -15,7 +15,7 @@ export default async function DeedPage({ params }: { params: Promise<{ id: strin
     id: id || "dev-001",
     brand: "Apple",
     model: "iPhone 15 Pro",
-    imei_primary: "358742091234567",
+    imei_primary: "358742091234562",
     serial_number: "F2LLN0G9XXXX",
     owner_name: "Verified Gadget Owner",
     registered_at: "2026-08-15T14:30:00Z",
