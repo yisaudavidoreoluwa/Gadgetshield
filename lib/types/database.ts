@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'technician' | 'admin';
+export type UserRole = 'owner' | 'technician' | 'fleet_manager' | 'admin';
 export type DeviceStatus = 'CLEAN' | 'STOLEN' | 'RECOVERED' | 'TRANSFERRED';
 export type VerificationAction = 'INTAKE_HOLD' | 'SERVICE_DECLINED' | 'CLEAN_INTAKE';
 
@@ -9,6 +9,7 @@ export interface Profile {
   phone_number?: string;
   shop_name?: string;
   market_location?: string;
+  company_name?: string;
   is_verified: boolean;
   created_at: string;
   updated_at: string;
@@ -26,6 +27,25 @@ export interface Device {
   purchase_receipt_url?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface FleetAsset extends Device {
+  asset_tag: string;
+  assigned_to_name?: string;
+  assigned_to_email?: string;
+  department?: string;
+  assigned_at?: string;
+  lockdown_status?: 'ACTIVE' | 'LOCKED_DOWN';
+}
+
+export interface FleetAuditLog {
+  id: string;
+  timestamp: string;
+  action: 'ASSIGNED' | 'UNASSIGNED' | 'LOCKDOWN_TRIGGERED' | 'LOCKDOWN_RELEASED' | 'VERIFIED_CLEAN' | 'ASSET_CREATED';
+  asset_id: string;
+  asset_name: string;
+  actor: string;
+  details: string;
 }
 
 export interface TheftReport {

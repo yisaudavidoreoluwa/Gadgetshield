@@ -14,6 +14,7 @@ import {
   Mail,
   User,
   Zap,
+  Building2,
   ArrowLeft
 } from "lucide-react";
 import { useAuth } from "@/lib/supabase/auth-context";
@@ -45,10 +46,12 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Instant Demo Login
-  const handleQuickDemo = (role: "owner" | "technician") => {
-    loginDemoUser(role);
+  const handleQuickDemo = (role: "owner" | "technician" | "fleet_manager") => {
+    loginDemoUser(role as any);
     if (role === "technician") {
       router.push("/technician/scan");
+    } else if (role === "fleet_manager") {
+      router.push("/dashboard/fleet");
     } else {
       router.push("/dashboard/devices");
     }
@@ -127,22 +130,30 @@ export default function LoginPage() {
         <p className="text-[11px] text-zinc-400 leading-relaxed">
           Test all features instantly with preloaded hardware deeds and verified shop status:
         </p>
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => handleQuickDemo("technician")}
-            className="p-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 text-white text-xs font-medium flex items-center justify-center gap-2 transition hover:scale-[1.02]"
-          >
-            <Wrench className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Tech Hub Demo</span>
-          </button>
+        <div className="grid grid-cols-3 gap-2 pt-1">
           <button
             type="button"
             onClick={() => handleQuickDemo("owner")}
-            className="p-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-sky-500/50 text-white text-xs font-medium flex items-center justify-center gap-2 transition hover:scale-[1.02]"
+            className="p-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-sky-500/50 text-white text-[11px] font-medium flex flex-col items-center justify-center gap-1.5 transition hover:scale-[1.02]"
           >
-            <Smartphone className="w-3.5 h-3.5 text-sky-400" />
-            <span>Owner Deeds Demo</span>
+            <Smartphone className="w-4 h-4 text-sky-400" />
+            <span>Consumer</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickDemo("fleet_manager")}
+            className="p-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-amber-500/50 text-white text-[11px] font-medium flex flex-col items-center justify-center gap-1.5 transition hover:scale-[1.02]"
+          >
+            <Building2 className="w-4 h-4 text-amber-400" />
+            <span>SME Fleet</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickDemo("technician")}
+            className="p-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 text-white text-[11px] font-medium flex flex-col items-center justify-center gap-1.5 transition hover:scale-[1.02]"
+          >
+            <Wrench className="w-4 h-4 text-emerald-400" />
+            <span>Dealer & Tech</span>
           </button>
         </div>
       </div>

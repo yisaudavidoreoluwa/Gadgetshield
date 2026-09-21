@@ -23,7 +23,8 @@ import {
   Check,
   ChevronRight,
   ExternalLink,
-  Laptop
+  Laptop,
+  Building2
 } from "lucide-react";
 import { validateImeiLuhn } from "@/lib/utils/luhn";
 
@@ -53,27 +54,34 @@ export default function HomePage() {
           Instant IMEI optical scanning paired with the deceptive <strong>Stealth Safety Protocol</strong>.
         </p>
 
-        <div className="mt-10 flex flex-wrap justify-center gap-4 text-xs font-medium">
+        <div className="mt-10 flex flex-wrap justify-center gap-3 text-xs font-medium">
           <Link
             href="/technician/scan"
-            className="bg-white hover:bg-zinc-200 text-zinc-950 font-semibold px-7 py-4 rounded-full flex items-center gap-2.5 transition-all shadow-xl shadow-white/10 hover:scale-105 duration-200"
+            className="bg-white hover:bg-zinc-200 text-zinc-950 font-semibold px-6 py-3.5 rounded-full flex items-center gap-2 transition-all shadow-xl shadow-white/10 hover:scale-105 duration-200"
           >
             <QrCode className="w-4 h-4" />
-            Launch Technician Hub
+            Dealer & Tech Hub
           </Link>
           <Link
             href="/dashboard/devices"
-            className="glass-panel hover:bg-zinc-800/80 text-white px-7 py-4 rounded-full flex items-center gap-2.5 transition-all hover:scale-105 duration-200"
+            className="glass-panel hover:bg-zinc-800/80 text-white px-6 py-3.5 rounded-full flex items-center gap-2 transition-all hover:scale-105 duration-200"
           >
             <Smartphone className="w-4 h-4" />
-            Owner Registry & Deeds
+            Consumer Deeds
+          </Link>
+          <Link
+            href="/dashboard/fleet"
+            className="glass-panel hover:bg-zinc-800/80 text-amber-300 border-amber-500/30 px-6 py-3.5 rounded-full flex items-center gap-2 transition-all hover:scale-105 duration-200"
+          >
+            <Building2 className="w-4 h-4 text-amber-400" />
+            SME Fleet Portal
           </Link>
           <Link
             href="/verify"
-            className="glass-pill text-zinc-300 hover:text-white px-7 py-4 rounded-full flex items-center gap-2.5 transition-all hover:bg-zinc-800/50"
+            className="glass-pill text-zinc-300 hover:text-white px-6 py-3.5 rounded-full flex items-center gap-2 transition-all hover:bg-zinc-800/50"
           >
             <Search className="w-4 h-4" />
-            Public IMEI Check
+            Public Search
           </Link>
         </div>
 
@@ -511,43 +519,187 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. THE 3 CORE PILLARS */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+      {/* 4. TARGET PERSONAS & PURPOSE-BUILT SOLUTIONS */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
+        <div className="text-center space-y-3 mb-12">
+          <span className="text-xs font-mono tracking-widest uppercase text-emerald-400">
+            Target Personas // Purpose-Built Ecosystem
+          </span>
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-white">
+            Engineered for Three Pillars of Hardware Defense
+          </h2>
+          <p className="text-sm text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+            From individual gadget owners to corporate fleet administrators and second-hand retail dealers, RupalShield solves specific critical problems without battery-draining invasive software.
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="glass-panel p-7 rounded-3xl space-y-3.5 border-zinc-800/80 shadow-xl">
-            <div className="w-10 h-10 rounded-2xl bg-zinc-800/80 flex items-center justify-center text-white shadow-inner">
-              <EyeOff className="w-5 h-5 text-emerald-400" />
+          {/* PERSONA 1: CONSUMER & TECH PROFESSIONAL */}
+          <div className="glass-panel p-7 sm:p-8 rounded-3xl space-y-5 border-zinc-800/80 shadow-2xl flex flex-col justify-between hover:border-zinc-700 transition">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-11 h-11 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shadow-inner">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-mono tracking-widest text-sky-400 glass-pill px-2.5 py-1 rounded-full uppercase">
+                  Consumer & Pro
+                </span>
+              </div>
+
+              <div>
+                <h3 className="text-base font-semibold text-white tracking-tight">
+                  Consumer / Tech Professional
+                </h3>
+                <p className="text-xs text-sky-300/80 font-mono mt-0.5">
+                  Proof of Ownership & Recovery without Malware
+                </p>
+              </div>
+
+              <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-3.5 text-xs text-zinc-300 italic leading-relaxed">
+                &ldquo;Wants proof of ownership, anti-theft tracking, and an emergency recovery mechanism without battery-draining invasive malware.&rdquo;
+              </div>
+
+              <ul className="space-y-2 text-xs text-zinc-400">
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                  <span><strong>Zero Battery Drain:</strong> Hardware-anchored deeds require zero background client apps or tracking daemons.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                  <span><strong>Cryptographic Digital Deeds:</strong> Immutable ownership records tied to 15-digit Luhn IMEIs and Serial Numbers.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                  <span><strong>Police Incident Clearance:</strong> Instant generation of official theft dockets with unique Crime Reference numbers.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                  <span><strong>Clean Title Transfer:</strong> Transfer digital deeds to buyers securely when selling or gifting devices.</span>
+                </li>
+              </ul>
             </div>
-            <h3 className="text-base font-semibold tracking-tight text-white">
-              The Stealth Safety Protocol
-            </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              When a stolen device is scanned over the counter, the interface shifts to a deceptive OEM hardware diagnostic card. Zero alarm banners. GPS coordinates and IP are logged silently while exonerating the repairer with a legal Clean Hands Token.
-            </p>
+
+            <div className="pt-4 border-t border-zinc-800/60">
+              <Link
+                href="/dashboard/devices"
+                className="w-full py-3 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition border border-zinc-800"
+              >
+                <span>Open Owner Registry</span>
+                <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+              </Link>
+            </div>
           </div>
 
-          <div className="glass-panel p-7 rounded-3xl space-y-3.5 border-zinc-800/80 shadow-xl">
-            <div className="w-10 h-10 rounded-2xl bg-zinc-800/80 flex items-center justify-center text-white shadow-inner">
-              <Smartphone className="w-5 h-5 text-sky-400" />
+          {/* PERSONA 2: SME IT FLEET MANAGER */}
+          <div className="glass-panel p-7 sm:p-8 rounded-3xl space-y-5 border-amber-500/30 shadow-2xl flex flex-col justify-between hover:border-amber-500/50 transition relative overflow-hidden bg-gradient-to-b from-amber-950/10 to-transparent">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-inner">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-mono tracking-widest text-amber-400 glass-pill px-2.5 py-1 rounded-full uppercase border-amber-500/30">
+                  SME IT & Enterprise
+                </span>
+              </div>
+
+              <div>
+                <h3 className="text-base font-semibold text-white tracking-tight">
+                  SME IT Fleet Manager
+                </h3>
+                <p className="text-xs text-amber-300/80 font-mono mt-0.5">
+                  Centralized Inventory & Instant Remote Lockdown
+                </p>
+              </div>
+
+              <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-3.5 text-xs text-zinc-300 italic leading-relaxed">
+                &ldquo;Needs centralized inventory management, automated employee device assignment, audit logs, and instant remote lockdown.&rdquo;
+              </div>
+
+              <ul className="space-y-2 text-xs text-zinc-400">
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span><strong>Centralized Hardware Inventory:</strong> Track company laptops, tablets, and phones under unified Company Asset Tags.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span><strong>Automated Employee Assignment:</strong> Allocate custody to staff with corporate email and department chain of custody.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span><strong>Instant Remote Lockdown:</strong> 1-Click emergency lockdown broadcasts compromised assets to every repair shop in the country.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span><strong>Fleet Audit Event Trail:</strong> Complete timestamped logs of hardware deployments, handoffs, and verification checks.</span>
+                </li>
+              </ul>
             </div>
-            <h3 className="text-base font-semibold tracking-tight text-white">
-              Digital Ownership Deeds
-            </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Verifiable proof of device ownership anchored by 15-digit Luhn-validated IMEIs, serial numbers, and invoice proofs. Legitimate handoff mechanism to transfer deeds to buyers without friction.
-            </p>
+
+            <div className="pt-4 border-t border-zinc-800/60">
+              <Link
+                href="/dashboard/fleet"
+                className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold flex items-center justify-center gap-2 transition shadow-lg"
+              >
+                <span>Access SME Fleet Portal</span>
+                <ChevronRight className="w-3.5 h-3.5 text-zinc-950" />
+              </Link>
+            </div>
           </div>
 
-          <div className="glass-panel p-7 rounded-3xl space-y-3.5 border-zinc-800/80 shadow-xl">
-            <div className="w-10 h-10 rounded-2xl bg-zinc-800/80 flex items-center justify-center text-white shadow-inner">
-              <Printer className="w-5 h-5 text-zinc-300" />
+          {/* PERSONA 3: SECOND-HAND GADGET DEALER */}
+          <div className="glass-panel p-7 sm:p-8 rounded-3xl space-y-5 border-emerald-500/30 shadow-2xl flex flex-col justify-between hover:border-emerald-500/50 transition relative overflow-hidden bg-gradient-to-b from-emerald-950/10 to-transparent">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-inner">
+                  <QrCode className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-mono tracking-widest text-emerald-400 glass-pill px-2.5 py-1 rounded-full uppercase border-emerald-500/30">
+                  Dealer & Workshop
+                </span>
+              </div>
+
+              <div>
+                <h3 className="text-base font-semibold text-white tracking-tight">
+                  Second-Hand Gadget Dealer
+                </h3>
+                <p className="text-xs text-emerald-300/80 font-mono mt-0.5">
+                  Pre-Purchase Validation & Anti-Fencing Defense
+                </p>
+              </div>
+
+              <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-3.5 text-xs text-zinc-300 italic leading-relaxed">
+                &ldquo;Needs instant IMEI/Serial status validation before purchasing used gadgets to prevent acquiring blacklisted property.&rdquo;
+              </div>
+
+              <ul className="space-y-2 text-xs text-zinc-400">
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span><strong>Instant Title Clearance:</strong> Optical barcode scanning & photo upload verifying clean title in under 40ms.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span><strong>Stealth Safety Protocol:</strong> Displays a deceptive OEM diagnostic card when stolen gear is scanned, preventing counter violence.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span><strong>Clean Hands Intake Ticket:</strong> Cryptographic token proving due diligence and protecting dealers from police receiving charges.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span><strong>Universal Hardware Controls:</strong> Bench torch toggle, digital zoom slider, and multi-lens switching for workbench scanning.</span>
+                </li>
+              </ul>
             </div>
-            <h3 className="text-base font-semibold tracking-tight text-white">
-              Police Incident Clearance
-            </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              One-tap stolen toggle instantly generates a standardized, printable police incident clearance docket containing cryptographic hashes, theft references, and chain of custody for insurers.
-            </p>
+
+            <div className="pt-4 border-t border-zinc-800/60">
+              <Link
+                href="/technician/scan"
+                className="w-full py-3 px-4 rounded-xl bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-semibold flex items-center justify-center gap-2 transition shadow-lg"
+              >
+                <span>Launch Dealer Scanner</span>
+                <ChevronRight className="w-3.5 h-3.5 text-zinc-950" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
