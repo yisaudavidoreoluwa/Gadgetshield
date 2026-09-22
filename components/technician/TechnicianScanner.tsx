@@ -56,10 +56,7 @@ export default function TechnicianScanner() {
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [maxZoom, setMaxZoom] = useState<number>(3);
 
-  // Quick test helpers
-  const setDemoStolen = () => setManualImei("862345041234564");
-  const setDemoClean = () => setManualImei("358742091234562");
-  const setDemoUnregistered = () => setManualImei("352094081765437");
+
 
   useEffect(() => {
     setHasNativeBarcodeDetector(typeof window !== "undefined" && "BarcodeDetector" in window);
@@ -576,33 +573,11 @@ export default function TechnicianScanner() {
             {/* Manual IMEI Input with Luhn Check & Quick Demos */}
             <div className="glass-panel rounded-2xl p-4 space-y-3 shadow-xl">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-zinc-300">
-                  Manual IMEI / Serial Lookup
+                <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest block">
+                  Manual Optical IMEI / Serial Lookup
                 </label>
-                <div className="flex items-center gap-2 font-mono text-[10px]">
-                  <button
-                    onClick={setDemoStolen}
-                    className="text-amber-400 hover:text-amber-300 underline transition"
-                    title="Load mock stolen IMEI for testing stealth protocol"
-                  >
-                    Stolen Demo
-                  </button>
-                  <span className="text-zinc-700">|</span>
-                  <button
-                    onClick={setDemoClean}
-                    className="text-emerald-400 hover:text-emerald-300 underline transition"
-                    title="Load mock clean IMEI for testing clean title"
-                  >
-                    Clean Demo
-                  </button>
-                  <span className="text-zinc-700">|</span>
-                  <button
-                    onClick={setDemoUnregistered}
-                    className="text-zinc-400 hover:text-white underline transition"
-                    title="Load mock unregistered IMEI"
-                  >
-                    Unregistered
-                  </button>
+                <div className="flex items-center gap-2 font-mono text-[10px] text-zinc-500">
+                  <span>15-Digit Luhn Mod 10</span>
                 </div>
               </div>
 

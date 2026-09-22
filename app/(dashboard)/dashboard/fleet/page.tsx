@@ -25,8 +25,10 @@ import {
 import { hybridStore } from "@/lib/storage/hybrid-store";
 import { FleetAsset, FleetAuditLog } from "@/lib/types/database";
 import { formatDateTime } from "@/lib/utils/formatters";
+import { useAuth } from "@/lib/supabase/auth-context";
 
 export default function FleetPage() {
+  const { user } = useAuth();
   const [assets, setAssets] = useState<FleetAsset[]>([]);
   const [auditLogs, setAuditLogs] = useState<FleetAuditLog[]>([]);
   const [activeTab, setActiveTab] = useState<"inventory" | "audit">("inventory");
@@ -42,16 +44,16 @@ export default function FleetPage() {
   // Lockdown Confirm State
   const [lockdownAsset, setLockdownAsset] = useState<FleetAsset | null>(null);
 
-  useEffect(() => {
-    loadFleetData();
-  }, []);
-
-  const loadFleetData = () => {
-    const loadedAssets = hybridStore.getFleetAssets();
+  const loadFleetData = React.useCallback(() => {
+    const loadedAssets = hybridStore.getFleetAssets(user?.id);
     const loadedLogs = hybridStore.getFleetAuditLogs();
     setAssets(loadedAssets);
     setAuditLogs(loadedLogs);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadFleetData();
+  }, [loadFleetData]);
 
   const handleOpenAssign = (asset: FleetAsset) => {
     setAssigningAsset(asset);

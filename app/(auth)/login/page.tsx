@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { 
   Shield, 
   Smartphone, 
@@ -13,11 +14,12 @@ import {
   Lock,
   Mail,
   User,
-  Zap,
   Building2,
-  ArrowLeft
+  ArrowLeft,
+  FileCheck
 } from "lucide-react";
 import { useAuth } from "@/lib/supabase/auth-context";
+import { UserRole } from "@/lib/types/database";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,7 +27,6 @@ export default function LoginPage() {
     signInWithPassword, 
     signUpWithPassword, 
     signInWithOtp, 
-    loginDemoUser,
     isConfigured 
   } = useAuth();
 
@@ -36,33 +37,30 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [selectedRole, setSelectedRole] = useState<"owner" | "technician">("owner");
+  const [selectedRole, setSelectedRole] = useState<UserRole>("owner");
+
+  // SME Fleet specific fields
+  const [companyName, setCompanyName] = useState("");
+  const [rcNumber, setRcNumber] = useState("");
+
+  // Technician specific fields
   const [shopName, setShopName] = useState("");
-  const [marketLocation, setMarketLocation] = useState("");
+  const [workshopAddress, setWorkshopAddress] = useState("");
+  const [tradeAssociation, setTradeAssociation] = useState("CAPDAN (Computer and Allied Products Dealers)");
+  const [licenseNumber, setLicenseNumber] = useState("");
+  const [proofDocumentUrl, setProofDocumentUrl] = useState("");
 
   // Feedback states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Instant Demo Login
-  const handleQuickDemo = (role: "owner" | "technician" | "fleet_manager") => {
-    loginDemoUser(role as any);
-    if (role === "technician") {
-      router.push("/technician/scan");
-    } else if (role === "fleet_manager") {
-      router.push("/dashboard/fleet");
-    } else {
-      router.push("/dashboard/devices");
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage(null);
 
-    // 1. OTP Mode
+    // 1. OTP / Magic Link Mode
     if (useOtp) {
       const { error } = await signInWithOtp(email, selectedRole);
       if (error) {
@@ -83,20 +81,43 @@ export default function LoginPage() {
         return;
       }
 
+      if (selectedRole === "technician") {
+        if (!shopName.trim() || !workshopAddress.trim() || !licenseNumber.trim()) {
+          setErrorMessage("Technician registration strictly requires workshop trading name, street address, and trade guild license number.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      if (selectedRole === "fleet_manager") {
+        if (!companyName.trim() || !rcNumber.trim()) {
+          setErrorMessage("SME Fleet registration requires Company Name and Corporate Affairs / RC Number.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const { error } = await signUpWithPassword(email, password, {
         full_name: fullName.trim() || email.split("@")[0],
         role: selectedRole,
+        company_name: selectedRole === "fleet_manager" ? companyName.trim() : undefined,
+        rc_number: selectedRole === "fleet_manager" ? rcNumber.trim() : undefined,
         shop_name: selectedRole === "technician" ? shopName.trim() : undefined,
-        market_location: selectedRole === "technician" ? marketLocation.trim() : undefined,
+        workshop_address: selectedRole === "technician" ? workshopAddress.trim() : undefined,
+        trade_association: selectedRole === "technician" ? tradeAssociation.trim() : undefined,
+        license_number: selectedRole === "technician" ? licenseNumber.trim() : undefined,
+        proof_document_url: selectedRole === "technician" ? proofDocumentUrl.trim() : undefined,
       });
 
       if (error) {
-        setErrorMessage(error.message || "Sign up failed. Please check your details.");
+        setErrorMessage(error.message || "Sign up failed. Please verify your details.");
         setIsSubmitting(false);
       } else {
         setIsSubmitting(false);
         if (selectedRole === "technician") {
           router.push("/technician/scan");
+        } else if (selectedRole === "fleet_manager") {
+          router.push("/dashboard/fleet");
         } else {
           router.push("/dashboard/devices");
         }
@@ -113,6 +134,8 @@ export default function LoginPage() {
       setIsSubmitting(false);
       if (selectedRole === "technician") {
         router.push("/technician/scan");
+      } else if (selectedRole === "fleet_manager") {
+        router.push("/dashboard/fleet");
       } else {
         router.push("/dashboard/devices");
       }
@@ -120,218 +143,313 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto py-12 px-4 space-y-5">
-      {/* 1-Tap Quick Demo Access Pill */}
-      <div className="glass-panel rounded-3xl p-5 border-emerald-500/30 space-y-3 shadow-xl">
-        <div className="flex items-center gap-2 text-xs font-semibold text-white">
-          <Zap className="w-4 h-4 text-emerald-400" />
-          <span>One-Tap Instant Demo Access (No Signup Needed)</span>
-        </div>
-        <p className="text-[11px] text-zinc-400 leading-relaxed">
-          Test all features instantly with preloaded hardware deeds and verified shop status:
-        </p>
-        <div className="grid grid-cols-3 gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => handleQuickDemo("owner")}
-            className="p-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-sky-500/50 text-white text-[11px] font-medium flex flex-col items-center justify-center gap-1.5 transition hover:scale-[1.02]"
+    <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 sm:px-6">
+      <div className="w-full max-w-lg space-y-6">
+        {/* Back Link */}
+        <div className="flex items-center justify-between">
+          <Link
+            href="/"
+            className="glass-pill text-xs text-zinc-300 hover:text-white px-3.5 py-1.5 rounded-full flex items-center gap-1.5 transition"
           >
-            <Smartphone className="w-4 h-4 text-sky-400" />
-            <span>Consumer</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickDemo("fleet_manager")}
-            className="p-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-amber-500/50 text-white text-[11px] font-medium flex flex-col items-center justify-center gap-1.5 transition hover:scale-[1.02]"
-          >
-            <Building2 className="w-4 h-4 text-amber-400" />
-            <span>SME Fleet</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickDemo("technician")}
-            className="p-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 text-white text-[11px] font-medium flex flex-col items-center justify-center gap-1.5 transition hover:scale-[1.02]"
-          >
-            <Wrench className="w-4 h-4 text-emerald-400" />
-            <span>Dealer & Tech</span>
-          </button>
-        </div>
-      </div>
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Home
+          </Link>
 
-      {/* Main Auth Form Container */}
-      <div className="glass-panel rounded-3xl p-7 space-y-6 shadow-2xl border-zinc-700/60">
-        {/* Header */}
-        <div className="text-center space-y-1.5">
-          <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-b from-zinc-100 to-zinc-300 text-zinc-950 flex items-center justify-center font-bold shadow-lg">
-            <Shield className="w-6 h-6 fill-black stroke-black" />
-          </div>
-          <h1 className="text-lg font-semibold tracking-wide text-white">
-            {authMode === "signin" ? "Sign In to RupalShield" : "Create Personal Account"}
-          </h1>
-          <p className="text-xs text-zinc-400">
-            {authMode === "signin" 
-              ? "Access your registered hardware deeds & verification hub"
-              : "Register as a gadget owner or certified repair hub"}
-          </p>
+          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+            SECURE ACCESS GATE
+          </span>
         </div>
 
-        {/* Tab Switcher: Sign In vs Sign Up */}
-        <div className="grid grid-cols-2 gap-1 p-1 bg-zinc-900/90 rounded-2xl border border-zinc-800 text-xs font-medium">
-          <button
-            type="button"
-            onClick={() => { setAuthMode("signin"); setErrorMessage(null); setOtpSent(false); }}
-            className={`py-2 rounded-xl transition-all ${
-              authMode === "signin"
-                ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => { setAuthMode("signup"); setErrorMessage(null); setOtpSent(false); }}
-            className={`py-2 rounded-xl transition-all ${
-              authMode === "signup"
-                ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            Create Account
-          </button>
-        </div>
-
-        {/* Error Alert */}
-        {errorMessage && (
-          <div className="glass-panel border-red-500/30 text-red-200 text-xs p-3.5 rounded-2xl flex items-center gap-2.5">
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {/* OTP Success State */}
-        {otpSent ? (
-          <div className="glass-panel border-emerald-500/30 text-emerald-300 text-xs p-6 rounded-2xl text-center space-y-3">
-            <CheckCircle2 className="w-9 h-9 text-emerald-400 mx-auto" />
-            <h3 className="text-sm font-semibold text-white">Authentication Link Dispatched</h3>
-            <p className="text-zinc-400 text-xs leading-relaxed">
-              We sent a secure sign-in link to <strong className="text-white font-mono">{email}</strong>.
+        {/* Main Card */}
+        <div className="glass-panel rounded-3xl p-7 sm:p-9 shadow-2xl border-zinc-700/80 space-y-6">
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-b from-zinc-100 to-zinc-300 text-black flex items-center justify-center font-bold shadow-md">
+              <Shield className="w-6 h-6 fill-black stroke-black" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              {authMode === "signin" ? "Sign In to Private Console" : "Create Protected Account"}
+            </h1>
+            <p className="text-xs text-zinc-400">
+              {authMode === "signin"
+                ? "Enter your credentials to access your private hardware registry."
+                : "Register your private workspace with strict role-based isolation."}
             </p>
+          </div>
+
+          {/* Mode Tabs (Sign In vs Sign Up) */}
+          <div className="glass-panel p-1 rounded-2xl flex items-center border border-zinc-800 text-xs">
             <button
-              onClick={() => setOtpSent(false)}
-              className="mt-3 text-xs text-white underline hover:text-zinc-300 font-medium"
+              type="button"
+              onClick={() => {
+                setAuthMode("signin");
+                setErrorMessage(null);
+              }}
+              className={`flex-1 py-2 rounded-xl font-medium transition ${
+                authMode === "signin"
+                  ? "bg-white text-zinc-950 font-semibold shadow"
+                  : "text-zinc-400 hover:text-white"
+              }`}
             >
-              Sign in with password instead
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("signup");
+                setErrorMessage(null);
+              }}
+              className={`flex-1 py-2 rounded-xl font-medium transition ${
+                authMode === "signup"
+                  ? "bg-white text-zinc-950 font-semibold shadow"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              Register New Account
             </button>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            {/* Role Selection */}
-            <div>
-              <label className="block text-zinc-400 mb-1.5 font-medium">Account Role</label>
-              <div className="grid grid-cols-2 gap-2">
+
+          {/* Persona Role Tabs (When Signing Up) */}
+          {authMode === "signup" && (
+            <div className="space-y-2">
+              <label className="text-[11px] font-mono uppercase text-zinc-400 block">
+                Select Your Account Persona:
+              </label>
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedRole("owner")}
-                  className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 transition-all ${
+                  className={`p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1.5 ${
                     selectedRole === "owner"
-                      ? "border-zinc-500 bg-zinc-800/80 text-white font-semibold"
-                      : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-zinc-200"
+                      ? "bg-zinc-800 border-white text-white shadow"
+                      : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
                   }`}
                 >
-                  <Smartphone className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Gadget Owner</span>
+                  <Smartphone className="w-4 h-4 text-sky-400" />
+                  <span className="text-xs font-semibold">Gadget Owner</span>
+                  <span className="text-[9px] text-zinc-500 font-mono">Personal Deeds</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole("fleet_manager")}
+                  className={`p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1.5 ${
+                    selectedRole === "fleet_manager"
+                      ? "bg-zinc-800 border-white text-white shadow"
+                      : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                  }`}
+                >
+                  <Building2 className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-semibold">SME Fleet</span>
+                  <span className="text-[9px] text-zinc-500 font-mono">Company IT</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setSelectedRole("technician")}
-                  className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 transition-all ${
+                  className={`p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1.5 ${
                     selectedRole === "technician"
-                      ? "border-zinc-500 bg-zinc-800/80 text-white font-semibold"
-                      : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-zinc-200"
+                      ? "bg-zinc-800 border-white text-white shadow"
+                      : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
                   }`}
                 >
-                  <Wrench className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Technician</span>
+                  <Wrench className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-semibold">Technician</span>
+                  <span className="text-[9px] text-zinc-500 font-mono">Proof Req.</span>
                 </button>
               </div>
             </div>
+          )}
 
-            {/* Extra profile fields for Signup */}
+          {/* Feedback Alerts */}
+          {errorMessage && (
+            <div className="glass-panel border-red-500/50 bg-red-500/10 text-red-300 p-3.5 rounded-2xl text-xs flex items-center gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {otpSent && (
+            <div className="glass-panel border-emerald-500/50 bg-emerald-500/10 text-emerald-300 p-3.5 rounded-2xl text-xs flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Magic link dispatched to {email}. Follow the email link to authenticate.</span>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
             {authMode === "signup" && (
-              <div>
-                <label className="block text-zinc-400 mb-1.5 font-medium">Full Name *</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono uppercase text-zinc-400 block">
+                  Full Name / Contact Person
+                </label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+                  <User className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3.5" />
                   <input
-                    required
                     type="text"
+                    required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Alex Morgan"
-                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl pl-10 pr-3.5 py-2.5 text-white focus:outline-none focus:border-zinc-500 transition"
+                    placeholder="e.g. David Oreoluwa"
+                    className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl pl-10 pr-4 py-3 text-xs text-white focus:outline-none focus:border-zinc-500 transition"
                   />
                 </div>
               </div>
             )}
 
-            {/* Technician specific fields on Signup */}
-            {authMode === "signup" && selectedRole === "technician" && (
-              <div className="space-y-3 pt-1 border-t border-zinc-800/60">
-                <div>
-                  <label className="block text-zinc-400 mb-1.5 font-medium">Repair Hub / Shop Name *</label>
-                  <input
-                    required
-                    type="text"
-                    value={shopName}
-                    onChange={(e) => setShopName(e.target.value)}
-                    placeholder="e.g. Apex Micro-Soldering Hub"
-                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-zinc-500 transition"
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-400 mb-1.5 font-medium">Market Cluster Location *</label>
-                  <input
-                    required
-                    type="text"
-                    value={marketLocation}
-                    onChange={(e) => setMarketLocation(e.target.value)}
-                    placeholder="e.g. Computer Village Slot 14"
-                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-zinc-500 transition"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Email Address */}
-            <div>
-              <label className="block text-zinc-400 mb-1.5 font-medium">Email Address *</label>
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono uppercase text-zinc-400 block">
+                {selectedRole === "fleet_manager" ? "Corporate Work Email" : "Email Address"}
+              </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+                <Mail className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3.5" />
                 <input
-                  required
                   type="email"
+                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="operator@repairhub.io"
-                  className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl pl-10 pr-3.5 py-2.5 text-white focus:outline-none focus:border-zinc-500 transition font-mono"
+                  placeholder="name@example.com"
+                  className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl pl-10 pr-4 py-3 text-xs text-white focus:outline-none focus:border-zinc-500 transition"
                 />
               </div>
             </div>
 
-            {/* Password (hidden if OTP mode) */}
+            {/* Password Field (unless OTP) */}
             {!useOtp && (
-              <div>
-                <label className="block text-zinc-400 mb-1.5 font-medium">Password *</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono uppercase text-zinc-400 block">
+                  Password (6+ characters)
+                </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
+                  <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3.5" />
                   <input
-                    required
                     type="password"
+                    required
+                    minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password (min 6 chars)"
-                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl pl-10 pr-3.5 py-2.5 text-white focus:outline-none focus:border-zinc-500 transition"
+                    placeholder="••••••••"
+                    className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl pl-10 pr-4 py-3 text-xs text-white focus:outline-none focus:border-zinc-500 transition"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* SME Fleet specific inputs */}
+            {authMode === "signup" && selectedRole === "fleet_manager" && (
+              <div className="space-y-3 pt-2 border-t border-zinc-800 animate-in fade-in">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono uppercase text-zinc-400 block">
+                    Enterprise / Company Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="e.g. Apex Global Technologies Ltd"
+                    className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-zinc-500 transition"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono uppercase text-zinc-400 block">
+                    Corporate Registration / RC Number
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={rcNumber}
+                    onChange={(e) => setRcNumber(e.target.value)}
+                    placeholder="e.g. RC-1849201"
+                    className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl px-4 py-3 text-xs text-white font-mono focus:outline-none focus:border-zinc-500 transition"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Technician Accreditation Proof Form */}
+            {authMode === "signup" && selectedRole === "technician" && (
+              <div className="space-y-3.5 pt-3 border-t border-zinc-800 animate-in fade-in bg-zinc-950/40 p-4 rounded-2xl border">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-1.5">
+                    <FileCheck className="w-3.5 h-3.5" />
+                    Mandatory Trade Accreditation Proof
+                  </span>
+                  <p className="text-[11px] text-zinc-400 leading-tight">
+                    Technician registration is strictly vetted. Provide your repair hub trading details.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono uppercase text-zinc-400 block">
+                    Workshop Trading Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={shopName}
+                    onChange={(e) => setShopName(e.target.value)}
+                    placeholder="e.g. Apex Micro-Soldering Hub"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono uppercase text-zinc-400 block">
+                    Physical Workshop Address & Cluster
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={workshopAddress}
+                    onChange={(e) => setWorkshopAddress(e.target.value)}
+                    placeholder="e.g. Otigba Street, Computer Village, Ikeja"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono uppercase text-zinc-400 block">
+                    Trade Guild / Regulatory Body
+                  </label>
+                  <select
+                    value={tradeAssociation}
+                    onChange={(e) => setTradeAssociation(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500"
+                  >
+                    <option value="CAPDAN (Computer and Allied Products Dealers)">CAPDAN (Computer & Allied Products Dealers)</option>
+                    <option value="Apple Independent Repair Provider (IRP)">Apple Independent Repair Provider (IRP)</option>
+                    <option value="IEEE Hardware & Consumer Technology Guild">IEEE Hardware & Consumer Technology Guild</option>
+                    <option value="CAC Registered Business (RC / BN)">CAC Registered Business (RC / BN)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono uppercase text-zinc-400 block">
+                    License ID / Accreditation Code
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={licenseNumber}
+                    onChange={(e) => setLicenseNumber(e.target.value)}
+                    placeholder="e.g. CAPDAN-2026-V88 or IRP-NG-88912"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-zinc-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono uppercase text-zinc-400 block">
+                    Proof Certificate or Workshop Photo URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    value={proofDocumentUrl}
+                    onChange={(e) => setProofDocumentUrl(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500"
                   />
                 </div>
               </div>
@@ -340,45 +458,34 @@ export default function LoginPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting || !email}
-              className="w-full bg-white hover:bg-zinc-200 text-zinc-950 font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg disabled:bg-zinc-800 disabled:text-zinc-500"
+              disabled={isSubmitting}
+              className="w-full bg-white hover:bg-zinc-200 text-zinc-950 font-semibold text-xs py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2 transition shadow-lg disabled:bg-zinc-800 disabled:text-zinc-500"
             >
               {isSubmitting ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Authenticating...
+                </>
               ) : (
                 <>
-                  <span>
-                    {useOtp 
-                      ? "Send Magic Link" 
-                      : authMode === "signup" ? "Create Free Account" : "Sign In with Password"}
-                  </span>
+                  {authMode === "signin" ? "Sign In to Registry" : "Complete Registration"}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
 
-            {/* Toggle OTP vs Password */}
-            <div className="text-center pt-2">
+            {/* Toggle OTP Mode */}
+            <div className="text-center pt-1">
               <button
                 type="button"
                 onClick={() => setUseOtp(!useOtp)}
-                className="text-[11px] text-zinc-400 hover:text-zinc-200 transition flex items-center justify-center gap-1 mx-auto"
+                className="text-[11px] text-zinc-500 hover:text-zinc-300 transition font-mono"
               >
-                {useOtp ? (
-                  <>
-                    <ArrowLeft className="w-3 h-3" />
-                    <span>Use Password instead</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Use Email Magic Link / OTP instead</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </>
-                )}
+                {useOtp ? "Use standard email & password" : "Or sign in via passwordless Magic Link"}
               </button>
             </div>
           </form>
-        )}
+        </div>
       </div>
     </div>
   );

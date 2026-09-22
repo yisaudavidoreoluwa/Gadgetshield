@@ -41,26 +41,28 @@ export default function DevicesPage() {
   // Load devices from hybrid store and sync with live server if available
   const loadDevices = useCallback(() => {
     setIsLoadingDevices(true);
-    // 1. Instant load from local hybrid store
-    const local = hybridStore.getDevices();
+    // 1. Instant load from local hybrid store strictly scoped to user
+    const local = hybridStore.getDevices(user?.id);
     setDevices(local);
     setIsLoadingDevices(false);
 
     // 2. Background attempt to query server
-    try {
-      fetch("/api/devices")
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data?.devices && Array.isArray(data.devices)) {
-            const merged = hybridStore.mergeDevices(data.devices);
-            setDevices(merged);
-          }
-        })
-        .catch(() => {});
-    } catch {
-      // Ignore background error
+    if (user?.id) {
+      try {
+        fetch("/api/devices")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data?.devices && Array.isArray(data.devices)) {
+              const merged = hybridStore.mergeDevices(data.devices);
+              setDevices(merged.filter(d => d.owner_id === user.id));
+            }
+          })
+          .catch(() => {});
+      } catch {
+        // Ignore background error
+      }
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadDevices();
@@ -106,7 +108,7 @@ export default function DevicesPage() {
   };
 
   const handleDeviceRegistered = (newDevice: Device) => {
-    const updated = hybridStore.getDevices();
+    const updated = hybridStore.getDevices(user?.id);
     setDevices(updated);
   };
 

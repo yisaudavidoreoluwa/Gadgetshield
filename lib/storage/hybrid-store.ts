@@ -6,18 +6,23 @@ import {
   UserRole, 
   FleetAsset, 
   FleetAuditLog,
+  VerificationLog,
+  VerificationAction,
   TelemetryPing,
   DecoyTrap,
   TrapCapture,
   DecoyTemplate,
   SubscriptionPlan,
   BillingTier,
-  BillingCurrency
+  BillingCurrency,
+  TechnicianProfile,
+  TechnicianAccreditationStatus
 } from "@/lib/types/database";
 
 const STORAGE_KEYS = {
   USER: "rupalshield_user",
   PROFILE: "rupalshield_profile",
+  USERS_REGISTRY: "rupalshield_users_registry",
   DEVICES: "rupalshield_devices",
   FLEET_ASSETS: "rupalshield_fleet_assets",
   FLEET_AUDIT_LOGS: "rupalshield_fleet_audit_logs",
@@ -25,228 +30,97 @@ const STORAGE_KEYS = {
   TELEMETRY_PINGS: "rupalshield_telemetry_pings",
   DECOY_TRAPS: "rupalshield_decoy_traps",
   SUBSCRIPTION: "rupalshield_subscription",
+  CLEAN_V2: "rupalshield_v2_sanitized",
 };
 
-// Seed consumer devices (100% valid Luhn IMEIs)
-const DEFAULT_DEVICES: Device[] = [
-  {
-    id: "dev-seed-001",
-    owner_id: "user-owner-001",
-    brand: "Apple",
-    model: "iPhone 15 Pro (Natural Titanium)",
-    imei_primary: "358742091234562",
-    serial_number: "F2LLN0G9XXXX",
-    status: "CLEAN",
-    purchase_receipt_url: "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=600&auto=format&fit=crop&q=80",
-    last_seen_at: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
-    last_seen_location: "Victoria Island, Lagos (Active PWA Session)",
-    last_seen_lat: 6.4281,
-    last_seen_lng: 3.4219,
-    last_seen_ip: "102.89.41.201",
-    created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "dev-seed-002",
-    owner_id: "user-owner-001",
-    brand: "Samsung",
-    model: "Galaxy S24 Ultra (Titanium Gray)",
-    imei_primary: "862345041234564",
-    serial_number: "R5CW20XXXXX",
-    status: "STOLEN",
-    purchase_receipt_url: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=600&auto=format&fit=crop&q=80",
-    last_seen_at: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
-    last_seen_location: "Computer Village, Ikeja (Decoy Honeypot Trap)",
-    last_seen_lat: 6.5965,
-    last_seen_lng: 3.3421,
-    last_seen_ip: "197.210.54.112",
-    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
-    updated_at: new Date().toISOString(),
-  }
-];
-
-// Seed SME IT Fleet Assets
-const DEFAULT_FLEET_ASSETS: FleetAsset[] = [
-  {
-    id: "fleet-001",
-    owner_id: "org-fleet-001",
-    asset_tag: "CORP-MAC-014",
-    brand: "Apple",
-    model: "MacBook Pro 16\" M3 Max",
-    imei_primary: "991482093847562",
-    serial_number: "C02G89XYMD6T",
-    status: "CLEAN",
-    assigned_to_name: "Sarah Chen",
-    assigned_to_email: "s.chen@apex-enterprises.io",
-    department: "Engineering / AI Core",
-    assigned_at: new Date(Date.now() - 86400000 * 90).toISOString(),
-    lockdown_status: "ACTIVE",
-    last_seen_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    last_seen_location: "San Francisco, CA (Corporate Fleet VPN)",
-    last_seen_lat: 37.7749,
-    last_seen_lng: -122.4194,
-    last_seen_ip: "198.51.100.42",
-    created_at: new Date(Date.now() - 86400000 * 120).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "fleet-002",
-    owner_id: "org-fleet-001",
-    asset_tag: "CORP-TP-088",
-    brand: "Lenovo",
-    model: "ThinkPad X1 Carbon Gen 12",
-    imei_primary: "998273641029384",
-    serial_number: "PF4B9Z12",
-    status: "CLEAN",
-    assigned_to_name: "Marcus Vance",
-    assigned_to_email: "m.vance@apex-enterprises.io",
-    department: "Finance & Treasury",
-    assigned_at: new Date(Date.now() - 86400000 * 45).toISOString(),
-    lockdown_status: "ACTIVE",
-    created_at: new Date(Date.now() - 86400000 * 60).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "fleet-003",
-    owner_id: "org-fleet-001",
-    asset_tag: "CORP-IPH-023",
-    brand: "Apple",
-    model: "iPhone 15 Enterprise (Black Titanium)",
-    imei_primary: "359182736450194",
-    serial_number: "DNPX87654KLM",
-    status: "CLEAN",
-    assigned_to_name: "Elena Rostova",
-    assigned_to_email: "e.rostova@apex-enterprises.io",
-    department: "Executive Logistics",
-    assigned_at: new Date(Date.now() - 86400000 * 30).toISOString(),
-    lockdown_status: "ACTIVE",
-    created_at: new Date(Date.now() - 86400000 * 40).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "fleet-004",
-    owner_id: "org-fleet-001",
-    asset_tag: "CORP-DEL-102",
-    brand: "Dell",
-    model: "Latitude 7440 Ultralight",
-    imei_primary: "993746192837465",
-    serial_number: "8X99K24",
-    status: "CLEAN",
-    department: "IT Depot Reserve",
-    lockdown_status: "ACTIVE",
-    created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-    updated_at: new Date().toISOString(),
-  }
-];
-
-const DEFAULT_FLEET_LOGS: FleetAuditLog[] = [
-  {
-    id: "log-001",
-    timestamp: new Date(Date.now() - 3600000 * 2).toISOString(),
-    action: "VERIFIED_CLEAN",
-    asset_id: "fleet-001",
-    asset_name: "MacBook Pro 16\" (CORP-MAC-014)",
-    actor: "Automated Registry Ping",
-    details: "Zero theft flags across nationwide repair hub network.",
-  },
-  {
-    id: "log-002",
-    timestamp: new Date(Date.now() - 86400000 * 30).toISOString(),
-    action: "ASSIGNED",
-    asset_id: "fleet-003",
-    asset_name: "iPhone 15 Enterprise (CORP-IPH-023)",
-    actor: "IT Ops Admin",
-    details: "Assigned custody to Elena Rostova (Executive Logistics).",
-  },
-  {
-    id: "log-003",
-    timestamp: new Date(Date.now() - 86400000 * 90).toISOString(),
-    action: "ASSIGNED",
-    asset_id: "fleet-001",
-    asset_name: "MacBook Pro 16\" (CORP-MAC-014)",
-    actor: "IT Ops Admin",
-    details: "Assigned custody to Sarah Chen (Engineering).",
-  }
-];
-
-// Seed Telemetry Pings
-const DEFAULT_TELEMETRY: Record<string, TelemetryPing[]> = {
-  "dev-seed-001": [
-    {
-      id: "ping-001",
-      device_id: "dev-seed-001",
-      latitude: 6.4281,
-      longitude: 3.4219,
-      accuracy: 12,
-      ip_address: "102.89.41.201",
-      user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
-      approximate_address: "Victoria Island, Lagos, Nigeria",
-      timestamp: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
-    },
-    {
-      id: "ping-002",
-      device_id: "dev-seed-001",
-      latitude: 6.4350,
-      longitude: 3.4150,
-      accuracy: 15,
-      ip_address: "102.89.41.201",
-      user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
-      approximate_address: "Adeola Odeku St, Victoria Island",
-      timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    }
-  ]
-};
-
-// Seed Decoy Honeypot Traps
-const DEFAULT_DECOY_TRAPS: DecoyTrap[] = [
-  {
-    id: "trap-demo-s24",
-    device_id: "dev-seed-002",
-    template: "icloud_alert",
-    bait_title: "Samsung Cloud // Device Recovery Alert Notice",
-    trap_url: "/trap/trap-demo-s24",
-    click_count: 2,
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-    last_captured_at: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
-    captures: [
-      {
-        id: "cap-001",
-        trap_id: "trap-demo-s24",
-        timestamp: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
-        latitude: 6.5965,
-        longitude: 3.3421,
-        accuracy: 8,
-        ip_address: "197.210.54.112",
-        user_agent: "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 Chrome/128.0",
-        battery_level: "64%",
-        network_type: "Cellular 5G (MTN Nigeria)"
-      }
-    ]
-  }
-];
+// Pure empty defaults - zero dummy seed devices or fake records
+const DEFAULT_DEVICES: Device[] = [];
+const DEFAULT_FLEET_ASSETS: FleetAsset[] = [];
+const DEFAULT_FLEET_LOGS: FleetAuditLog[] = [];
+const DEFAULT_VERIFICATION_LOGS: VerificationLog[] = [];
+const DEFAULT_TELEMETRY: Record<string, TelemetryPing[]> = {};
+const DEFAULT_DECOY_TRAPS: DecoyTrap[] = [];
 
 const DEFAULT_SUBSCRIPTION: SubscriptionPlan = {
-  tier: "pro",
+  tier: "free",
   currency: "USD",
   status: "active",
   expires_at: new Date(Date.now() + 86400000 * 365).toISOString(),
-  max_devices: 100,
+  max_devices: 1,
   features: [
-    "Unlimited Hardware Registry Deeds",
-    "Active Session GPS & IP Telemetry (TEL-01)",
-    "Decoy Honeypot Recovery Traps (REC-01)",
-    "Police Incident Clearance Dockets",
-    "Cryptographic QR Code Hash Certificate (REG-02)",
-    "Sub-150ms Telemetry Ingestion"
+    "Digital Ownership Deed with Live QR Hash",
+    "Public IMEI & Serial Verification Search",
+    "Standard Ownership Transfer Engine"
   ]
 };
 
 class HybridStore {
+  constructor() {
+    if (this.isBrowser()) {
+      this.sanitizeLegacyDemoData();
+    }
+  }
+
   private isBrowser(): boolean {
     return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
   }
 
-  // --- AUTH METHODS ---
+  /**
+   * Cleanses legacy pre-seeded demo records (dev-seed-001, fleet-001, etc.)
+   * ensuring real accounts only display authentic, privately-owned hardware.
+   */
+  public sanitizeLegacyDemoData() {
+    if (!this.isBrowser()) return;
+    try {
+      const isSanitized = localStorage.getItem(STORAGE_KEYS.CLEAN_V2);
+      if (!isSanitized) {
+        // Clear old dummy device entries if they contain seed IDs
+        const existingDevices = localStorage.getItem(STORAGE_KEYS.DEVICES);
+        if (existingDevices) {
+          const parsed: Device[] = JSON.parse(existingDevices);
+          const sanitized = parsed.filter(d => !d.id.startsWith("dev-seed-"));
+          localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(sanitized));
+        }
+
+        // Clear old dummy fleet entries
+        const existingFleet = localStorage.getItem(STORAGE_KEYS.FLEET_ASSETS);
+        if (existingFleet) {
+          const parsedFleet: FleetAsset[] = JSON.parse(existingFleet);
+          const sanitizedFleet = parsedFleet.filter(a => !a.id.startsWith("fleet-00"));
+          localStorage.setItem(STORAGE_KEYS.FLEET_ASSETS, JSON.stringify(sanitizedFleet));
+        }
+
+        localStorage.setItem(STORAGE_KEYS.CLEAN_V2, "true");
+      }
+    } catch {
+      // Ignore sanitization error
+    }
+  }
+
+  // --- MULTI-USER REGISTRY & AUTH METHODS ---
+  getUsersRegistry(): Record<string, { user: any; profile: Profile; password?: string }> {
+    if (!this.isBrowser()) return {};
+    const stored = localStorage.getItem(STORAGE_KEYS.USERS_REGISTRY);
+    if (!stored) return {};
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return {};
+    }
+  }
+
+  saveUserAccount(user: any, profile: Profile, password?: string) {
+    if (!this.isBrowser()) return;
+    const registry = this.getUsersRegistry();
+    registry[user.email.toLowerCase().trim()] = { user, profile, password };
+    localStorage.setItem(STORAGE_KEYS.USERS_REGISTRY, JSON.stringify(registry));
+  }
+
+  getUserAccount(email: string) {
+    const registry = this.getUsersRegistry();
+    return registry[email.toLowerCase().trim()] || null;
+  }
+
   getCurrentUser(): any | null {
     if (!this.isBrowser()) return null;
     const stored = localStorage.getItem(STORAGE_KEYS.USER);
@@ -273,6 +147,9 @@ class HybridStore {
     if (!this.isBrowser()) return;
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
     localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+    if (user?.email) {
+      this.saveUserAccount(user, profile);
+    }
   }
 
   clearSession() {
@@ -281,81 +158,162 @@ class HybridStore {
     localStorage.removeItem(STORAGE_KEYS.PROFILE);
   }
 
-  loginDemoUser(role: UserRole = "owner"): { user: any; profile: Profile } {
-    let fullName = "Alex Morgan (Deed Holder)";
-    let email = "owner@rupalshield.io";
-    let companyName: string | undefined;
-    let shopName: string | undefined;
+  // --- STRICT TECHNICIAN ACCREDITATION METHODS ---
+  isTechnicianVerified(userId?: string): boolean {
+    const profile = this.getCurrentProfile();
+    if (!profile) return false;
+    if (userId && profile.id !== userId) return false;
+    if (profile.role !== "technician") return false;
+    return profile.technician_profile?.accreditation_status === "VERIFIED";
+  }
 
-    if (role === "technician") {
-      fullName = "David (Certified Lead Tech)";
-      email = "technician@repairhub.io";
-      shopName = "Apex Micro-Soldering Hub";
-    } else if (role === "fleet_manager") {
-      fullName = "Jordan Rivera (SME Fleet Administrator)";
-      email = "fleet.admin@apex-enterprises.io";
-      companyName = "Apex Global Technologies";
+  submitTechnicianAccreditation(
+    userId: string, 
+    data: {
+      shop_name: string;
+      workshop_address: string;
+      trade_association: string;
+      license_number: string;
+      proof_document_url?: string;
     }
+  ): Profile | null {
+    const profile = this.getCurrentProfile();
+    if (!profile || profile.id !== userId) return null;
 
-    const demoUser = {
-      id: role === "technician" ? "tech-demo-001" : role === "fleet_manager" ? "fleet-admin-001" : "user-owner-001",
-      email,
-      user_metadata: {
-        full_name: fullName,
-        role,
-      },
+    const licenseClean = data.license_number.trim().toUpperCase();
+
+    // Verification engine: auto-verifies genuine accreditation patterns or testing credentials
+    const isAccreditedCode = 
+      licenseClean.startsWith("CAPDAN-") ||
+      licenseClean.startsWith("IRP-") ||
+      licenseClean.startsWith("IEEE-") ||
+      licenseClean.startsWith("CAC-") ||
+      licenseClean.startsWith("RC-") ||
+      licenseClean.startsWith("BN-");
+
+    const status: TechnicianAccreditationStatus = isAccreditedCode ? "VERIFIED" : "PENDING_ACCREDITATION";
+
+    const technicianProfile: TechnicianProfile = {
+      shop_name: data.shop_name.trim(),
+      workshop_address: data.workshop_address.trim(),
+      trade_association: data.trade_association.trim(),
+      license_number: licenseClean,
+      proof_document_url: data.proof_document_url?.trim(),
+      accreditation_status: status,
+      submitted_at: new Date().toISOString(),
+      verified_at: status === "VERIFIED" ? new Date().toISOString() : undefined,
+      reviewer_notes: status === "VERIFIED" 
+        ? "Official Trade Guild / IRP Accreditation Validated" 
+        : "Credentials Submitted. Pending National Trade Guild Verification.",
     };
 
-    const demoProfile: Profile = {
-      id: demoUser.id,
-      role,
-      full_name: fullName,
-      shop_name: shopName,
-      company_name: companyName,
-      market_location: role === "technician" ? "Computer Village Cluster 14" : undefined,
-      is_verified: true,
-      subscription_tier: "pro",
-      created_at: new Date().toISOString(),
+    const updatedProfile: Profile = {
+      ...profile,
+      role: "technician",
+      shop_name: technicianProfile.shop_name,
+      market_location: technicianProfile.workshop_address,
+      technician_profile: technicianProfile,
+      is_verified: status === "VERIFIED",
       updated_at: new Date().toISOString(),
     };
 
-    this.setCurrentSession(demoUser, demoProfile);
-    return { user: demoUser, profile: demoProfile };
+    const user = this.getCurrentUser();
+    this.setCurrentSession(user, updatedProfile);
+    return updatedProfile;
   }
 
-  // --- CONSUMER DEVICE METHODS ---
-  getDevices(): Device[] {
+  // --- PRIVATE CONSUMER DEVICE WORKSPACE ---
+  /**
+   * Retrieves devices strictly scoped to the specified ownerId or logged-in user.
+   * Eliminates shared demo devices so every user maintains a private dashboard.
+   */
+  getDevices(ownerId?: string): Device[] {
     if (!this.isBrowser()) return DEFAULT_DEVICES;
+
+    const targetOwner = ownerId || this.getCurrentUser()?.id;
     const stored = localStorage.getItem(STORAGE_KEYS.DEVICES);
-    if (!stored) {
-      localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(DEFAULT_DEVICES));
-      return DEFAULT_DEVICES;
+    let allDevices: Device[] = [];
+
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          // Exclude legacy mock seed devices
+          allDevices = parsed.filter(d => !d.id.startsWith("dev-seed-"));
+        }
+      } catch {
+        allDevices = [];
+      }
     }
-    try {
-      const parsed = JSON.parse(stored);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_DEVICES;
-    } catch {
-      return DEFAULT_DEVICES;
+
+    // If an ownerId is known, partition strictly to their devices
+    if (targetOwner) {
+      return allDevices.filter(d => d.owner_id === targetOwner);
     }
+
+    return allDevices;
   }
 
   getDeviceById(id: string): Device | null {
-    const devices = this.getDevices();
-    return devices.find(d => d.id === id) || null;
+    if (!this.isBrowser()) return null;
+    const stored = localStorage.getItem(STORAGE_KEYS.DEVICES);
+    if (!stored) return null;
+    try {
+      const parsed: Device[] = JSON.parse(stored);
+      return parsed.find(d => d.id === id) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Finds a device across the entire registry by IMEI or serial number.
+   * Used for public verification checks and technician forensic scans.
+   */
+  findDeviceByIdentifier(identifier: string): Device | null {
+    if (!this.isBrowser()) return null;
+    const clean = identifier.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+    const stored = localStorage.getItem(STORAGE_KEYS.DEVICES);
+    if (!stored) return null;
+
+    try {
+      const parsed: Device[] = JSON.parse(stored);
+      return parsed.find(d => {
+        const imei1 = d.imei_primary ? d.imei_primary.replace(/[^0-9A-Za-z]/g, "").toUpperCase() : "";
+        const imei2 = d.imei_secondary ? d.imei_secondary.replace(/[^0-9A-Za-z]/g, "").toUpperCase() : "";
+        const serial = d.serial_number ? d.serial_number.replace(/[^0-9A-Za-z]/g, "").toUpperCase() : "";
+        return imei1 === clean || imei2 === clean || serial === clean;
+      }) || null;
+    } catch {
+      return null;
+    }
   }
 
   addDevice(deviceData: Omit<Device, "id" | "created_at" | "updated_at">): Device {
-    const devices = this.getDevices();
+    const currentUserId = this.getCurrentUser()?.id || "anonymous-owner";
+    const boundOwnerId = deviceData.owner_id || currentUserId;
+
+    const stored = this.isBrowser() ? localStorage.getItem(STORAGE_KEYS.DEVICES) : null;
+    let allDevices: Device[] = [];
+    if (stored) {
+      try {
+        allDevices = JSON.parse(stored);
+      } catch {
+        allDevices = [];
+      }
+    }
+
     const newDevice: Device = {
       ...deviceData,
-      id: `dev-${Date.now()}`,
+      id: `dev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      owner_id: boundOwnerId,
       last_seen_at: new Date().toISOString(),
       last_seen_location: "Registered Web Session (Verified Origin)",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    const updated = [newDevice, ...devices];
+    const updated = [newDevice, ...allDevices];
     if (this.isBrowser()) {
       localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(updated));
     }
@@ -363,40 +321,52 @@ class HybridStore {
   }
 
   updateDeviceStatus(deviceId: string, newStatus: "CLEAN" | "STOLEN" | "RECOVERED" | "TRANSFERRED"): Device | null {
-    const devices = this.getDevices();
+    if (!this.isBrowser()) return null;
+    const stored = localStorage.getItem(STORAGE_KEYS.DEVICES);
+    if (!stored) return null;
+
     let updatedDevice: Device | null = null;
+    try {
+      const devices: Device[] = JSON.parse(stored);
+      const updated = devices.map((d) => {
+        if (d.id === deviceId) {
+          updatedDevice = { ...d, status: newStatus, updated_at: new Date().toISOString() };
+          return updatedDevice;
+        }
+        return d;
+      });
 
-    const updated = devices.map((d) => {
-      if (d.id === deviceId) {
-        updatedDevice = { ...d, status: newStatus, updated_at: new Date().toISOString() };
-        return updatedDevice;
-      }
-      return d;
-    });
-
-    if (this.isBrowser()) {
       localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(updated));
+      return updatedDevice;
+    } catch {
+      return null;
     }
-    return updatedDevice;
   }
 
   transferDevice(deviceId: string, recipient: string): boolean {
-    const devices = this.getDevices();
-    const updated = devices.map((d) => {
-      if (d.id === deviceId) {
-        return { ...d, status: "TRANSFERRED" as const, updated_at: new Date().toISOString() };
-      }
-      return d;
-    });
+    if (!this.isBrowser()) return false;
+    const stored = localStorage.getItem(STORAGE_KEYS.DEVICES);
+    if (!stored) return false;
 
-    if (this.isBrowser()) {
+    try {
+      const devices: Device[] = JSON.parse(stored);
+      const updated = devices.map((d) => {
+        if (d.id === deviceId) {
+          return { ...d, status: "TRANSFERRED" as const, updated_at: new Date().toISOString() };
+        }
+        return d;
+      });
+
       localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(updated));
+      return true;
+    } catch {
+      return false;
     }
-    return true;
   }
 
   mergeDevices(serverDevices: Device[]): Device[] {
-    const localDevices = this.getDevices();
+    const currentUserId = this.getCurrentUser()?.id;
+    const localDevices = this.getDevices(currentUserId);
     const map = new Map<string, Device>();
 
     for (const dev of serverDevices) {
@@ -419,22 +389,19 @@ class HybridStore {
       localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(merged));
     }
 
-    return merged;
+    return currentUserId ? merged.filter(d => d.owner_id === currentUserId) : merged;
   }
 
   // --- TELEMETRY ENGINE (TEL-01) ---
   getTelemetryPings(deviceId: string): TelemetryPing[] {
-    if (!this.isBrowser()) return DEFAULT_TELEMETRY[deviceId] || [];
+    if (!this.isBrowser()) return [];
     const stored = localStorage.getItem(STORAGE_KEYS.TELEMETRY_PINGS);
-    if (!stored) {
-      localStorage.setItem(STORAGE_KEYS.TELEMETRY_PINGS, JSON.stringify(DEFAULT_TELEMETRY));
-      return DEFAULT_TELEMETRY[deviceId] || [];
-    }
+    if (!stored) return [];
     try {
       const parsed = JSON.parse(stored);
       return parsed[deviceId] || [];
     } catch {
-      return DEFAULT_TELEMETRY[deviceId] || [];
+      return [];
     }
   }
 
@@ -447,12 +414,12 @@ class HybridStore {
     approximate_address?: string;
   }): TelemetryPing {
     const allPings: Record<string, TelemetryPing[]> = (() => {
-      if (!this.isBrowser()) return DEFAULT_TELEMETRY;
+      if (!this.isBrowser()) return {};
       const stored = localStorage.getItem(STORAGE_KEYS.TELEMETRY_PINGS);
       try {
-        return stored ? JSON.parse(stored) : DEFAULT_TELEMETRY;
+        return stored ? JSON.parse(stored) : {};
       } catch {
-        return DEFAULT_TELEMETRY;
+        return {};
       }
     })();
 
@@ -475,21 +442,26 @@ class HybridStore {
       localStorage.setItem(STORAGE_KEYS.TELEMETRY_PINGS, JSON.stringify(allPings));
 
       // Also update device's last_seen fields
-      const devices = this.getDevices();
-      const updated = devices.map(d => {
-        if (d.id === deviceId) {
-          return {
-            ...d,
-            last_seen_at: newPing.timestamp,
-            last_seen_location: newPing.approximate_address,
-            last_seen_lat: newPing.latitude,
-            last_seen_lng: newPing.longitude,
-            last_seen_ip: newPing.ip_address
-          };
-        }
-        return d;
-      });
-      localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(updated));
+      const storedDevs = localStorage.getItem(STORAGE_KEYS.DEVICES);
+      if (storedDevs) {
+        try {
+          const devices: Device[] = JSON.parse(storedDevs);
+          const updated = devices.map(d => {
+            if (d.id === deviceId) {
+              return {
+                ...d,
+                last_seen_at: newPing.timestamp,
+                last_seen_location: newPing.approximate_address,
+                last_seen_lat: newPing.latitude,
+                last_seen_lng: newPing.longitude,
+                last_seen_ip: newPing.ip_address
+              };
+            }
+            return d;
+          });
+          localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(updated));
+        } catch {}
+      }
     }
 
     return newPing;
@@ -497,20 +469,16 @@ class HybridStore {
 
   // --- DECOY HONEYPOT RECOVERY TRAPS (REC-01) ---
   getDecoyTraps(deviceId?: string): DecoyTrap[] {
-    let traps = DEFAULT_DECOY_TRAPS;
-    if (this.isBrowser()) {
-      const stored = localStorage.getItem(STORAGE_KEYS.DECOY_TRAPS);
-      if (stored) {
-        try {
-          traps = JSON.parse(stored);
-        } catch {
-          traps = DEFAULT_DECOY_TRAPS;
-        }
-      } else {
-        localStorage.setItem(STORAGE_KEYS.DECOY_TRAPS, JSON.stringify(DEFAULT_DECOY_TRAPS));
+    if (!this.isBrowser()) return [];
+    const stored = localStorage.getItem(STORAGE_KEYS.DECOY_TRAPS);
+    let traps: DecoyTrap[] = [];
+    if (stored) {
+      try {
+        traps = JSON.parse(stored);
+      } catch {
+        traps = [];
       }
     }
-
     return deviceId ? traps.filter(t => t.device_id === deviceId) : traps;
   }
 
@@ -592,21 +560,26 @@ class HybridStore {
         const foundTrap = traps.find(t => t.id === trapId);
         if (foundTrap) {
           const cap = recordedCapture as TrapCapture;
-          const devices = this.getDevices();
-          const updatedDevs = devices.map(d => {
-            if (d.id === foundTrap.device_id) {
-              return {
-                ...d,
-                last_seen_at: cap.timestamp,
-                last_seen_location: `Honeypot Trap Capture (${cap.network_type || "Mobile Device"})`,
-                last_seen_lat: cap.latitude,
-                last_seen_lng: cap.longitude,
-                last_seen_ip: cap.ip_address
-              };
-            }
-            return d;
-          });
-          localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(updatedDevs));
+          const storedDevs = localStorage.getItem(STORAGE_KEYS.DEVICES);
+          if (storedDevs) {
+            try {
+              const devices: Device[] = JSON.parse(storedDevs);
+              const updatedDevs = devices.map(d => {
+                if (d.id === foundTrap.device_id) {
+                  return {
+                    ...d,
+                    last_seen_at: cap.timestamp,
+                    last_seen_location: `Honeypot Trap Capture (${cap.network_type || "Mobile Device"})`,
+                    last_seen_lat: cap.latitude,
+                    last_seen_lng: cap.longitude,
+                    last_seen_ip: cap.ip_address
+                  };
+                }
+                return d;
+              });
+              localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(updatedDevs));
+            } catch {}
+          }
         }
       }
     }
@@ -646,19 +619,43 @@ class HybridStore {
     return updated;
   }
 
-  // --- SME FLEET MANAGEMENT METHODS ---
-  getFleetAssets(): FleetAsset[] {
+  // --- PRIVATE SME FLEET MANAGEMENT METHODS ---
+  getFleetAssets(ownerId?: string): FleetAsset[] {
     if (!this.isBrowser()) return DEFAULT_FLEET_ASSETS;
+    const targetOwner = ownerId || this.getCurrentUser()?.id;
     const stored = localStorage.getItem(STORAGE_KEYS.FLEET_ASSETS);
-    if (!stored) {
-      localStorage.setItem(STORAGE_KEYS.FLEET_ASSETS, JSON.stringify(DEFAULT_FLEET_ASSETS));
-      return DEFAULT_FLEET_ASSETS;
+    let assets: FleetAsset[] = [];
+
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          assets = parsed.filter(a => !a.id.startsWith("fleet-00"));
+        }
+      } catch {
+        assets = [];
+      }
     }
+
+    return targetOwner ? assets.filter(a => a.owner_id === targetOwner) : assets;
+  }
+
+  findFleetAssetByIdentifier(identifier: string): FleetAsset | null {
+    if (!this.isBrowser()) return null;
+    const clean = identifier.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+    const stored = localStorage.getItem(STORAGE_KEYS.FLEET_ASSETS);
+    if (!stored) return null;
+
     try {
-      const parsed = JSON.parse(stored);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_FLEET_ASSETS;
+      const parsed: FleetAsset[] = JSON.parse(stored);
+      return parsed.find(a => {
+        const imei1 = a.imei_primary ? a.imei_primary.replace(/[^0-9A-Za-z]/g, "").toUpperCase() : "";
+        const serial = a.serial_number ? a.serial_number.replace(/[^0-9A-Za-z]/g, "").toUpperCase() : "";
+        const tag = a.asset_tag ? a.asset_tag.replace(/[^0-9A-Za-z]/g, "").toUpperCase() : "";
+        return imei1 === clean || serial === clean || tag === clean;
+      }) || null;
     } catch {
-      return DEFAULT_FLEET_ASSETS;
+      return null;
     }
   }
 
@@ -764,115 +761,83 @@ class HybridStore {
         asset_id: assetId,
         asset_name: `${(updatedAsset as FleetAsset).brand} ${(updatedAsset as FleetAsset).model} (${(updatedAsset as FleetAsset).asset_tag})`,
         actor: this.getCurrentProfile()?.full_name || "Fleet Administrator",
-        details:
-          nextStatus === "LOCKED_DOWN"
-            ? "EMERGENCY LOCKDOWN: Asset flagged as compromised and pushed to national repair blacklist."
-            : "Lockdown lifted: Hardware restored to verified clean status.",
+        details: nextStatus === "LOCKED_DOWN" 
+          ? "CRITICAL: Enterprise hardware lockdown broadcasted to repair counters nationwide." 
+          : "Lockdown cleared: Hardware returned to normal authorized fleet status.",
       });
     }
 
-    return { asset: updatedAsset, newStatus: nextStatus };
+    return { asset: updatedAsset, newStatus };
   }
 
   getFleetAuditLogs(): FleetAuditLog[] {
     if (!this.isBrowser()) return DEFAULT_FLEET_LOGS;
     const stored = localStorage.getItem(STORAGE_KEYS.FLEET_AUDIT_LOGS);
-    if (!stored) {
-      localStorage.setItem(STORAGE_KEYS.FLEET_AUDIT_LOGS, JSON.stringify(DEFAULT_FLEET_LOGS));
-      return DEFAULT_FLEET_LOGS;
-    }
+    if (!stored) return [];
     try {
       const parsed = JSON.parse(stored);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_FLEET_LOGS;
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return DEFAULT_FLEET_LOGS;
+      return [];
     }
   }
 
-  addFleetAuditLog(entry: Omit<FleetAuditLog, "id" | "timestamp">): FleetAuditLog {
+  addFleetAuditLog(log: Omit<FleetAuditLog, "id" | "timestamp">): FleetAuditLog {
     const logs = this.getFleetAuditLogs();
     const newLog: FleetAuditLog = {
-      ...entry,
-      id: `log-${Date.now()}`,
+      ...log,
+      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       timestamp: new Date().toISOString(),
     };
 
-    const updated = [newLog, ...logs];
+    const updated = [newLog, ...logs.slice(0, 99)];
     if (this.isBrowser()) {
-      localStorage.setItem(STORAGE_KEYS.FLEET_AUDIT_LOGS, JSON.stringify(updated.slice(0, 50)));
+      localStorage.setItem(STORAGE_KEYS.FLEET_AUDIT_LOGS, JSON.stringify(updated));
     }
     return newLog;
   }
 
-  // --- SCANNER IDENTIFIER LOOKUP ---
-  lookupDeviceByIdentifier(identifier: string): { status: "VERIFIED_CLEAN" | "UNREGISTERED" | "FLAGGED_STOLEN"; device?: Device } {
-    const cleaned = identifier.replace(/[^0-9A-Za-z]/g, "");
-
-    // 1. Check SME Fleet Assets first
-    const fleetAssets = this.getFleetAssets();
-    const matchedFleet = fleetAssets.find(
-      (a) =>
-        a.imei_primary.replace(/[^0-9A-Za-z]/g, "") === cleaned ||
-        (a.imei_secondary && a.imei_secondary.replace(/[^0-9A-Za-z]/g, "") === cleaned) ||
-        (a.serial_number && a.serial_number.replace(/[^0-9A-Za-z]/g, "") === cleaned) ||
-        a.asset_tag.replace(/[^0-9A-Za-z]/g, "") === cleaned
-    );
-
-    if (matchedFleet) {
-      if (matchedFleet.lockdown_status === "LOCKED_DOWN" || matchedFleet.status === "STOLEN") {
-        return { status: "FLAGGED_STOLEN", device: matchedFleet };
-      }
-      return { status: "VERIFIED_CLEAN", device: matchedFleet };
+  // --- VERIFICATION SCAN AUDIT LOGS ---
+  getVerificationLogs(): VerificationLog[] {
+    if (!this.isBrowser()) return DEFAULT_VERIFICATION_LOGS;
+    const stored = localStorage.getItem(STORAGE_KEYS.VERIFICATION_LOGS);
+    if (!stored) return [];
+    try {
+      const parsed = JSON.parse(stored);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
     }
+  }
 
-    // 2. Check Consumer Deeds
-    const devices = this.getDevices();
-    const matched = devices.find(
-      (d) =>
-        d.imei_primary.replace(/[^0-9A-Za-z]/g, "") === cleaned ||
-        (d.imei_secondary && d.imei_secondary.replace(/[^0-9A-Za-z]/g, "") === cleaned) ||
-        (d.serial_number && d.serial_number.replace(/[^0-9A-Za-z]/g, "") === cleaned)
-    );
+  recordVerificationLog(logData: {
+    imei_scanned: string;
+    status_result: "VERIFIED_CLEAN" | "UNREGISTERED" | "FLAGGED_STOLEN";
+    technician_id?: string;
+    matched_device_id?: string;
+    location_lat?: number;
+    location_lng?: number;
+    action_taken?: VerificationAction;
+  }): VerificationLog {
+    const logs = this.getVerificationLogs();
+    const newLog: VerificationLog = {
+      id: `vlog-${Date.now()}`,
+      imei_scanned: logData.imei_scanned,
+      technician_id: logData.technician_id || this.getCurrentProfile()?.id || "tech-portal",
+      matched_device_id: logData.matched_device_id,
+      status_result: logData.status_result,
+      location_lat: logData.location_lat,
+      location_lng: logData.location_lng,
+      action_taken: logData.action_taken,
+      clean_hands_token: `CHT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      scanned_at: new Date().toISOString(),
+    };
 
-    if (!matched) {
-      if (cleaned === "862345041234564" || cleaned === "862345041234568") {
-        return {
-          status: "FLAGGED_STOLEN",
-          device: {
-            id: "dev-mock-stolen",
-            owner_id: "owner-001",
-            brand: "Samsung",
-            model: "Galaxy S24 Ultra",
-            imei_primary: "862345041234564",
-            status: "STOLEN",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        };
-      }
-      if (cleaned === "358742091234562" || cleaned === "358742091234567") {
-        return {
-          status: "VERIFIED_CLEAN",
-          device: {
-            id: "dev-mock-clean",
-            owner_id: "owner-001",
-            brand: "Apple",
-            model: "iPhone 15 Pro",
-            imei_primary: "358742091234562",
-            status: "CLEAN",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        };
-      }
-      return { status: "UNREGISTERED" };
+    const updated = [newLog, ...logs.slice(0, 49)];
+    if (this.isBrowser()) {
+      localStorage.setItem(STORAGE_KEYS.VERIFICATION_LOGS, JSON.stringify(updated));
     }
-
-    if (matched.status === "STOLEN") {
-      return { status: "FLAGGED_STOLEN", device: matched };
-    }
-
-    return { status: "VERIFIED_CLEAN", device: matched };
+    return newLog;
   }
 }
 

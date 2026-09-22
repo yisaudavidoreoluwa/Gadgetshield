@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   Shield, 
   QrCode, 
@@ -14,14 +14,19 @@ import {
   Menu, 
   X,
   ChevronDown,
-  Sparkles
+  Sparkles,
+  LogOut,
+  CheckCircle2,
+  Clock
 } from "lucide-react";
 import { useAuth } from "@/lib/supabase/auth-context";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { role, switchRole, user } = useAuth();
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const { role, profile, user, signOut } = useAuth();
 
   const navLinks = [
     { href: "/dashboard/devices", label: "Owner Registry", icon: Smartphone },
@@ -31,11 +36,15 @@ export default function Navbar() {
     { href: "/pricing", label: "Plans", icon: Sparkles },
   ];
 
-  const cycleRole = () => {
-    if (role === "owner") switchRole("fleet_manager");
-    else if (role === "fleet_manager") switchRole("technician");
-    else switchRole("owner");
+  const handleSignOut = async () => {
+    await signOut();
+    setUserDropdownOpen(false);
+    router.push("/");
   };
+
+  const isTechnician = role === "technician";
+  const isFleetManager = role === "fleet_manager";
+  const isAccredited = profile?.technician_profile?.accreditation_status === "VERIFIED";
 
   return (
     <header className="sticky top-3 z-40 px-4 sm:px-6 max-w-7xl mx-auto w-full no-print">
@@ -77,40 +86,106 @@ export default function Navbar() {
           })}
         </nav>
 
-        {/* Right Action: Role Badge & Profile */}
-        <div className="hidden md:flex items-center gap-2">
-          {/* Cupertino Role Toggle Pill */}
-          <button
-            onClick={cycleRole}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800/80 text-zinc-300 transition-colors"
-            title="Click to toggle between Owner, SME Fleet, and Dealer roles"
-          >
-            {role === "technician" ? (
-              <>
-                <Wrench className="w-3 h-3 text-emerald-400" />
-                <span className="text-zinc-200">Dealer Portal</span>
-              </>
-            ) : role === "fleet_manager" ? (
-              <>
-                <Building2 className="w-3 h-3 text-amber-400" />
-                <span className="text-zinc-200">SME Fleet</span>
-              </>
-            ) : (
-              <>
-                <Smartphone className="w-3 h-3 text-sky-400" />
-                <span className="text-zinc-200">Owner View</span>
-              </>
-            )}
-            <ChevronDown className="w-3 h-3 text-zinc-400 opacity-60 ml-0.5" />
-          </button>
+        {/* Right Action: Authenticated Profile & Role Badge */}
+        <div className="hidden md:flex items-center gap-2 relative">
+          {user ? (
+            <div className="relative">
+              <button
+                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800/80 text-zinc-200 transition"
+              >
+                {isTechnician ? (
+                  <>
+                    <Wrench className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{isAccredited ? "Certified Dealer" : "Pending Guild"}</span>
+                  </>
+                ) : isFleetManager ? (
+                  <>
+                    <Building2 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>SME Fleet Admin</span>
+                  </>
+                ) : (
+                  <>
+                    <Smartphone className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Gadget Owner</span>
+                  </>
+                )}
+                <ChevronDown className="w-3 h-3 text-zinc-400 opacity-60 ml-0.5" />
+              </button>
 
-          <Link
-            href="/login"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-zinc-100 hover:bg-white text-zinc-950 transition-all shadow-sm"
-          >
-            <User className="w-3.5 h-3.5" />
-            <span>{user ? "Account" : "Sign In"}</span>
-          </Link>
+              {/* User Dropdown Menu */}
+              {userDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 glass-panel rounded-2xl p-3 border border-zinc-700/80 shadow-2xl space-y-2 text-xs animate-in fade-in zoom-in-95 duration-150 z-50">
+                  <div className="px-2 py-1.5 border-b border-zinc-800 space-y-0.5">
+                    <div className="font-semibold text-white truncate">
+                      {profile?.full_name || "Authenticated User"}
+                    </div>
+                    <div className="text-[11px] text-zinc-400 font-mono truncate">
+                      {user.email}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Link
+                      href="/dashboard/devices"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-800 text-zinc-300 hover:text-white transition"
+                    >
+                      <Smartphone className="w-3.5 h-3.5 text-sky-400" />
+                      <span>My Private Registry</span>
+                    </Link>
+
+                    {isFleetManager && (
+                      <Link
+                        href="/dashboard/fleet"
+                        onClick={() => setUserDropdownOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-800 text-zinc-300 hover:text-white transition"
+                      >
+                        <Building2 className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Corporate IT Fleet</span>
+                      </Link>
+                    )}
+
+                    <Link
+                      href="/technician/scan"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-800 text-zinc-300 hover:text-white transition"
+                    >
+                      <Wrench className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Dealer Scanner Console</span>
+                    </Link>
+
+                    <Link
+                      href="/dashboard/billing"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-800 text-zinc-300 hover:text-white transition"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Subscription & Billing</span>
+                    </Link>
+                  </div>
+
+                  <div className="pt-1.5 border-t border-zinc-800">
+                    <button
+                      onClick={handleSignOut}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-red-400 hover:bg-red-500/10 transition font-medium text-left"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold bg-white hover:bg-zinc-200 text-zinc-950 transition-all shadow-sm"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </Link>
+          )}
         </div>
 
         {/* Mobile menu trigger */}
@@ -147,34 +222,24 @@ export default function Navbar() {
           })}
 
           <div className="pt-2 border-t border-zinc-800/80 flex flex-col gap-2">
-            <button
-              onClick={() => {
-                cycleRole();
-                setMobileMenuOpen(false);
-              }}
-              className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-zinc-900 text-zinc-300 border border-zinc-800"
-            >
-              <span className="flex items-center gap-2">
-                {role === "technician" ? (
-                  <Wrench className="w-3.5 h-3.5 text-emerald-400" />
-                ) : role === "fleet_manager" ? (
-                  <Building2 className="w-3.5 h-3.5 text-amber-400" />
-                ) : (
-                  <Smartphone className="w-3.5 h-3.5 text-sky-400" />
-                )}
-                Role: {role.toUpperCase()}
-              </span>
-              <span className="text-[10px] text-zinc-400 underline">Tap to Cycle</span>
-            </button>
-
-            <Link
-              href="/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-white text-zinc-950 font-semibold"
-            >
-              <User className="w-4 h-4" />
-              <span>{user ? "My Profile" : "Sign In / Register"}</span>
-            </Link>
+            {user ? (
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-red-400 bg-zinc-900 font-medium"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sign Out ({user.email})</span>
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-white text-zinc-950 font-bold"
+              >
+                <User className="w-4 h-4" />
+                <span>Sign In / Register</span>
+              </Link>
+            )}
           </div>
         </div>
       )}

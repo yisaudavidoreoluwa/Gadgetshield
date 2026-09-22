@@ -1,16 +1,39 @@
 export type UserRole = 'owner' | 'technician' | 'fleet_manager' | 'admin';
 export type DeviceStatus = 'CLEAN' | 'STOLEN' | 'RECOVERED' | 'TRANSFERRED';
 export type VerificationAction = 'INTAKE_HOLD' | 'SERVICE_DECLINED' | 'CLEAN_INTAKE';
+export type TechnicianAccreditationStatus = 'UNACCREDITED' | 'PENDING_ACCREDITATION' | 'VERIFIED' | 'REJECTED';
+
+export interface TechnicianProfile {
+  shop_name: string;
+  workshop_address: string;
+  trade_association: string;
+  license_number: string;
+  proof_document_url?: string;
+  accreditation_status: TechnicianAccreditationStatus;
+  submitted_at: string;
+  verified_at?: string;
+  reviewer_notes?: string;
+}
+
+export interface FleetProfile {
+  company_name: string;
+  rc_number: string;
+  corporate_domain?: string;
+  registered_at: string;
+}
 
 export interface Profile {
   id: string;
   role: UserRole;
   full_name: string;
+  email?: string;
   phone_number?: string;
   shop_name?: string;
   market_location?: string;
   company_name?: string;
   is_verified: boolean;
+  technician_profile?: TechnicianProfile;
+  fleet_profile?: FleetProfile;
   subscription_tier?: BillingTier;
   created_at: string;
   updated_at: string;

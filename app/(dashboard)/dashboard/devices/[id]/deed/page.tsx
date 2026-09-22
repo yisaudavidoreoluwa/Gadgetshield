@@ -35,27 +35,42 @@ export default function DeedPage({ params }: DeedPageProps) {
     if (typeof window !== "undefined") {
       setOrigin(window.location.origin);
     }
-    const devices = hybridStore.getDevices();
-    const found = devices.find((d) => d.id === deviceId);
+    const found = hybridStore.getDeviceById(deviceId);
     if (found) {
       setDevice(found);
     } else {
-      // Fallback preview
-      setDevice({
-        id: deviceId || "dev-demo",
-        owner_id: "user-owner-001",
-        brand: "Apple",
-        model: "iPhone 15 Pro",
-        imei_primary: "358742091234562",
-        serial_number: "F2LLN0G9XXXX",
-        status: "CLEAN",
-        created_at: "2026-08-15T14:30:00Z",
-        updated_at: new Date().toISOString(),
-      });
+      // Query server API
+      fetch(`/api/devices/${deviceId}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.device) {
+            setDevice(data.device);
+          }
+        })
+        .catch(() => {});
     }
   }, [deviceId]);
 
-  if (!device) return null;
+  if (!device) {
+    return (
+      <div className="max-w-md mx-auto py-16 px-4 text-center space-y-4">
+        <div className="w-12 h-12 mx-auto rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+          <FileCheck className="w-6 h-6 text-zinc-500" />
+        </div>
+        <h2 className="text-lg font-bold text-white">Deed Record Not Found</h2>
+        <p className="text-xs text-zinc-400">
+          No hardware deed matching ID "{deviceId}" is registered under your account.
+        </p>
+        <Link
+          href="/dashboard/devices"
+          className="inline-flex items-center gap-2 bg-white text-zinc-950 font-semibold text-xs px-4 py-2 rounded-xl transition hover:bg-zinc-200"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to Registry
+        </Link>
+      </div>
+    );
+  }
 
   const verifyUrl = `${origin}/verify?q=${device.imei_primary || device.serial_number}`;
   const deedToken = `RS-DEED-${(device.imei_primary || "000").slice(-6)}-${device.id.slice(-4).toUpperCase()}`;

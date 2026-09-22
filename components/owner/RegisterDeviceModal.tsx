@@ -56,18 +56,7 @@ export default function RegisterDeviceModal({
     setErrorMsg(null);
   };
 
-  // 1-Tap Fill Demo Gadget
-  const handleFillDemo = () => {
-    const demoImei = generateValidLuhnImei("35874209");
-    setDeviceCategory("phone");
-    setBrand("Apple");
-    setModel("iPhone 16 Pro (Desert Titanium)");
-    setImeiPrimary(demoImei);
-    setSerialNumber("H3KL90M2PQ8");
-    setReceiptFileName("Apple_Store_Invoice_2026.pdf");
-    setReceiptUrl("https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=600&auto=format&fit=crop&q=80");
-    setErrorMsg(null);
-  };
+
 
   // 1-Tap Fix / Complete Check Digit
   const handleFixCheckDigit = () => {
@@ -139,7 +128,7 @@ export default function RegisterDeviceModal({
 
     try {
       const payload = {
-        owner_id: user?.id || "user-owner-001",
+        owner_id: user?.id || (user?.email ? `usr-${user.email}` : "anonymous-owner"),
         brand: brand.trim(),
         model: model.trim(),
         imei_primary: finalImei,
@@ -193,15 +182,6 @@ export default function RegisterDeviceModal({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              className="text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full hover:bg-emerald-500/20 transition flex items-center gap-1"
-              title="Auto-fill with sample valid gadget data"
-            >
-              <Wand2 className="w-3 h-3" />
-              Fill Test Gadget
-            </button>
             <button
               onClick={onClose}
               className="text-zinc-400 hover:text-white p-1.5 rounded-full hover:bg-zinc-800/60 transition"

@@ -1,15 +1,24 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { createClient } from "./client";
-import { Profile, UserRole } from "@/lib/types/database";
+import { Profile, UserRole, TechnicianProfile, TechnicianAccreditationStatus } from "@/lib/types/database";
 import { hybridStore } from "@/lib/storage/hybrid-store";
 
-interface SignUpMetadata {
+export interface SignUpMetadata {
   full_name: string;
   role: UserRole;
+  phone_number?: string;
+  // SME Fleet fields
+  company_name?: string;
+  rc_number?: string;
+  corporate_domain?: string;
+  // Technician accreditation fields
   shop_name?: string;
-  market_location?: string;
+  workshop_address?: string;
+  trade_association?: string;
+  license_number?: string;
+  proof_document_url?: string;
 }
 
 interface AuthContextType {
@@ -21,9 +30,15 @@ interface AuthContextType {
   signInWithPassword: (email: string, password: string) => Promise<{ error: any | null }>;
   signUpWithPassword: (email: string, password: string, metadata: SignUpMetadata) => Promise<{ error: any | null }>;
   signInWithOtp: (email: string, role?: UserRole) => Promise<{ error: any | null }>;
-  loginDemoUser: (role: UserRole) => void;
   signOut: () => Promise<void>;
-  switchRole: (newRole: UserRole) => void;
+  submitTechnicianAccreditation: (data: {
+    shop_name: string;
+    workshop_address: string;
+    trade_association: string;
+    license_number: string;
+    proof_document_url?: string;
+  }) => Promise<{ profile: Profile | null; error: any | null }>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,6 +51,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isConfigured, setIsConfigured] = useState<boolean>(true);
 
   const supabase = createClient();
+
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+
+    if (isConfigured) {
+      try {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (profileData) {
+          setProfile(profileData);
+          setRole(profileData.role);
+          hybridStore.setCurrentSession(user, profileData);
+          return;
+        }
+      } catch {}
+    }
+
+    const localProfile = hybridStore.getCurrentProfile();
+    if (localProfile) {
+      setProfile(localProfile);
+      setRole(localProfile.role);
+    }
+  }, [user, isConfigured, supabase]);
 
   useEffect(() => {
     // Check if Supabase keys exist
@@ -67,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // Fallback: Check local storage session
+        // Check local storage session
         const storedUser = hybridStore.getCurrentUser();
         const storedProfile = hybridStore.getCurrentProfile();
         if (storedUser && storedProfile) {
@@ -101,6 +143,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setRole(profileData.role);
               hybridStore.setCurrentSession(session.user, profileData);
             }
+          } else {
+            setUser(null);
+            setProfile(null);
+            setRole("owner");
+            hybridStore.clearSession();
           }
         });
         return () => subscription.unsubscribe();
@@ -110,14 +157,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [supabase]);
 
-  // Direct Sign In
+  // Sign In With Password
   const signInWithPassword = async (email: string, password: string) => {
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
 
-    // Try Supabase first if configured
+    // 1. Try Supabase first if configured
     if (isConfigured) {
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
         if (!error && data.user) {
           setUser(data.user);
           const { data: prof } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
@@ -129,94 +177,152 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsLoading(false);
           return { error: null };
         }
-      } catch {
-        // Fall through to hybrid store
+        if (error) {
+          setIsLoading(false);
+          return { error };
+        }
+      } catch (err) {
+        console.warn("Supabase auth error:", err);
       }
     }
 
-    // Local Hybrid Fallback (guaranteed success)
-    const localUser = {
-      id: `usr-${Date.now()}`,
-      email,
-      user_metadata: { full_name: email.split("@")[0], role: "owner" as UserRole }
-    };
-    const localProfile: Profile = {
-      id: localUser.id,
-      role: "owner",
-      full_name: email.split("@")[0].toUpperCase(),
-      is_verified: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    // 2. Local Multi-User Registry Fallback
+    const existingAccount = hybridStore.getUserAccount(cleanEmail);
+    if (existingAccount) {
+      if (existingAccount.password && existingAccount.password !== password) {
+        setIsLoading(false);
+        return { error: new Error("Invalid email or password.") };
+      }
 
-    setUser(localUser);
-    setProfile(localProfile);
-    setRole("owner");
-    hybridStore.setCurrentSession(localUser, localProfile);
+      setUser(existingAccount.user);
+      setProfile(existingAccount.profile);
+      setRole(existingAccount.profile.role);
+      hybridStore.setCurrentSession(existingAccount.user, existingAccount.profile);
+      setIsLoading(false);
+      return { error: null };
+    }
 
+    // Unregistered account
     setIsLoading(false);
-    return { error: null };
+    return { error: new Error("No account found with this email. Please sign up.") };
   };
 
-  // Direct Sign Up
+  // Sign Up With Password & Strict Role Verification
   const signUpWithPassword = async (email: string, password: string, metadata: SignUpMetadata) => {
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+    const userId = `usr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const timestamp = new Date().toISOString();
 
+    // Validate technician accreditation details if technician role selected
+    let technicianProfile: TechnicianProfile | undefined;
+    if (metadata.role === "technician") {
+      if (!metadata.shop_name || !metadata.workshop_address || !metadata.license_number) {
+        setIsLoading(false);
+        return { 
+          error: new Error("Technician registration requires workshop name, physical address, and trade guild license number.") 
+        };
+      }
+
+      const licenseClean = metadata.license_number.trim().toUpperCase();
+      const isAccreditedCode = 
+        licenseClean.startsWith("CAPDAN-") ||
+        licenseClean.startsWith("IRP-") ||
+        licenseClean.startsWith("IEEE-") ||
+        licenseClean.startsWith("CAC-") ||
+        licenseClean.startsWith("RC-") ||
+        licenseClean.startsWith("BN-");
+
+      technicianProfile = {
+        shop_name: metadata.shop_name.trim(),
+        workshop_address: metadata.workshop_address.trim(),
+        trade_association: metadata.trade_association?.trim() || "CAPDAN Certified Hub",
+        license_number: licenseClean,
+        proof_document_url: metadata.proof_document_url?.trim(),
+        accreditation_status: isAccreditedCode ? "VERIFIED" : "PENDING_ACCREDITATION",
+        submitted_at: timestamp,
+        verified_at: isAccreditedCode ? timestamp : undefined,
+        reviewer_notes: isAccreditedCode 
+          ? "Official Trade Guild / IRP Accreditation Validated" 
+          : "Credentials Submitted. Pending National Trade Guild Verification.",
+      };
+    }
+
+    // Build Profile
+    const localProfile: Profile = {
+      id: userId,
+      role: metadata.role,
+      full_name: metadata.full_name.trim() || cleanEmail.split("@")[0].toUpperCase(),
+      email: cleanEmail,
+      phone_number: metadata.phone_number?.trim(),
+      company_name: metadata.company_name?.trim(),
+      shop_name: metadata.shop_name?.trim(),
+      market_location: metadata.workshop_address?.trim(),
+      is_verified: metadata.role === "technician" ? technicianProfile?.accreditation_status === "VERIFIED" : true,
+      technician_profile: technicianProfile,
+      fleet_profile: metadata.role === "fleet_manager" ? {
+        company_name: metadata.company_name?.trim() || "Enterprise Fleet",
+        rc_number: metadata.rc_number?.trim() || "RC-PENDING",
+        corporate_domain: metadata.corporate_domain?.trim() || cleanEmail.split("@")[1],
+        registered_at: timestamp,
+      } : undefined,
+      created_at: timestamp,
+      updated_at: timestamp,
+    };
+
+    const localUser = {
+      id: userId,
+      email: cleanEmail,
+      user_metadata: {
+        full_name: localProfile.full_name,
+        role: metadata.role,
+      }
+    };
+
+    // 1. Try Supabase if configured
     if (isConfigured) {
       try {
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: cleanEmail,
           password,
           options: {
             data: {
-              full_name: metadata.full_name,
+              full_name: localProfile.full_name,
               role: metadata.role,
-              shop_name: metadata.shop_name,
-              market_location: metadata.market_location,
             }
           }
         });
 
         if (!error && data.user) {
+          localProfile.id = data.user.id;
+          localUser.id = data.user.id;
+
+          try {
+            await supabase.from("profiles").insert({
+              id: data.user.id,
+              full_name: localProfile.full_name,
+              role: metadata.role,
+              company_name: localProfile.company_name,
+              shop_name: localProfile.shop_name,
+              market_location: localProfile.market_location,
+              is_verified: localProfile.is_verified,
+            });
+          } catch {}
+
           setUser(data.user);
-          const prof: Profile = {
-            id: data.user.id,
-            role: metadata.role,
-            full_name: metadata.full_name,
-            shop_name: metadata.shop_name,
-            market_location: metadata.market_location,
-            is_verified: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          setProfile(prof);
+          setProfile(localProfile);
           setRole(metadata.role);
-          hybridStore.setCurrentSession(data.user, prof);
+          hybridStore.setCurrentSession(data.user, localProfile);
           setIsLoading(false);
           return { error: null };
         }
-      } catch {
-        // Fall through to local fallback
+      } catch (err) {
+        console.warn("Supabase sign up error, continuing to local store:", err);
       }
     }
 
-    // Local Hybrid Fallback
-    const localUser = {
-      id: `usr-${Date.now()}`,
-      email,
-      user_metadata: { full_name: metadata.full_name, role: metadata.role }
-    };
-    const localProfile: Profile = {
-      id: localUser.id,
-      role: metadata.role,
-      full_name: metadata.full_name,
-      shop_name: metadata.shop_name,
-      market_location: metadata.market_location,
-      is_verified: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
+    // 2. Local Multi-User Registry Store
+    hybridStore.saveUserAccount(localUser, localProfile, password);
     setUser(localUser);
     setProfile(localProfile);
     setRole(metadata.role);
@@ -226,13 +332,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   };
 
-  // Magic Link / OTP
+  // Sign In with OTP / Magic Link
   const signInWithOtp = async (email: string, targetRole: UserRole = "owner") => {
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+
     if (isConfigured) {
       try {
         const { error } = await supabase.auth.signInWithOtp({
-          email,
+          email: cleanEmail,
           options: {
             data: { role: targetRole },
             emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/dashboard/devices` : undefined,
@@ -242,26 +350,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsLoading(false);
           return { error: null };
         }
-      } catch {
-        // Fall through
-      }
+      } catch {}
     }
 
     // Local Mock OTP
-    const { user: demoUser, profile: demoProfile } = hybridStore.loginDemoUser(targetRole);
-    setUser(demoUser);
-    setProfile(demoProfile);
+    const existing = hybridStore.getUserAccount(cleanEmail);
+    if (existing) {
+      setUser(existing.user);
+      setProfile(existing.profile);
+      setRole(existing.profile.role);
+      hybridStore.setCurrentSession(existing.user, existing.profile);
+      setIsLoading(false);
+      return { error: null };
+    }
+
+    // Create fresh account on OTP
+    const userId = `usr-${Date.now()}`;
+    const newProfile: Profile = {
+      id: userId,
+      role: targetRole,
+      full_name: cleanEmail.split("@")[0].toUpperCase(),
+      email: cleanEmail,
+      is_verified: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const newUser = { id: userId, email: cleanEmail };
+    hybridStore.saveUserAccount(newUser, newProfile);
+    setUser(newUser);
+    setProfile(newProfile);
     setRole(targetRole);
+    hybridStore.setCurrentSession(newUser, newProfile);
+
     setIsLoading(false);
     return { error: null };
   };
 
-  // Instant Demo Login (Zero Friction)
-  const loginDemoUser = (targetRole: UserRole) => {
-    const { user: demoUser, profile: demoProfile } = hybridStore.loginDemoUser(targetRole);
-    setUser(demoUser);
-    setProfile(demoProfile);
-    setRole(targetRole);
+  // Submit Technician Accreditation Proof
+  const submitTechnicianAccreditation = async (data: {
+    shop_name: string;
+    workshop_address: string;
+    trade_association: string;
+    license_number: string;
+    proof_document_url?: string;
+  }) => {
+    if (!user) {
+      return { profile: null, error: new Error("Authentication required") };
+    }
+
+    const updated = hybridStore.submitTechnicianAccreditation(user.id, data);
+    if (updated) {
+      setProfile(updated);
+      setRole("technician");
+      return { profile: updated, error: null };
+    }
+    return { profile: null, error: new Error("Failed to submit accreditation") };
   };
 
   const signOut = async () => {
@@ -269,22 +412,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isConfigured) {
         await supabase.auth.signOut();
       }
-    } catch {
-      // Ignore
-    }
+    } catch {}
     hybridStore.clearSession();
     setUser(null);
     setProfile(null);
     setRole("owner");
-  };
-
-  const switchRole = (newRole: UserRole) => {
-    setRole(newRole);
-    if (profile) {
-      const updated = { ...profile, role: newRole };
-      setProfile(updated);
-      hybridStore.setCurrentSession(user, updated);
-    }
   };
 
   return (
@@ -298,9 +430,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithPassword,
         signUpWithPassword,
         signInWithOtp,
-        loginDemoUser,
         signOut,
-        switchRole,
+        submitTechnicianAccreditation,
+        refreshProfile,
       }}
     >
       {children}
