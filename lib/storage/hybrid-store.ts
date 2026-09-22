@@ -16,7 +16,11 @@ import {
   BillingTier,
   BillingCurrency,
   TechnicianProfile,
-  TechnicianAccreditationStatus
+  TechnicianAccreditationStatus,
+  ConsentRecord,
+  ConsentType,
+  ConsentStatus,
+  AuditLog
 } from "@/lib/types/database";
 
 const STORAGE_KEYS = {
@@ -29,6 +33,8 @@ const STORAGE_KEYS = {
   VERIFICATION_LOGS: "rupalshield_verification_logs",
   TELEMETRY_PINGS: "rupalshield_telemetry_pings",
   DECOY_TRAPS: "rupalshield_decoy_traps",
+  CONSENT_RECORDS: "rupalshield_consent_records",
+  AUDIT_LOGS: "rupalshield_audit_logs",
   SUBSCRIPTION: "rupalshield_subscription",
   CLEAN_V2: "rupalshield_v2_sanitized",
 };
@@ -532,6 +538,7 @@ class HybridStore {
           id: `cap-${Date.now()}`,
           trap_id: trapId,
           timestamp: new Date().toISOString(),
+          consent_acknowledged: true,
           latitude: captureData.latitude,
           longitude: captureData.longitude,
           accuracy: captureData.accuracy || 10,
@@ -838,6 +845,164 @@ class HybridStore {
       localStorage.setItem(STORAGE_KEYS.VERIFICATION_LOGS, JSON.stringify(updated));
     }
     return newLog;
+  }
+
+  // --- PRIVACY & CONSENT MANAGEMENT (GDPR / NDPR) ---
+  getConsentRecords(userId?: string): ConsentRecord[] {
+    if (!this.isBrowser()) return [];
+    const targetUserId = userId || this.getCurrentUser()?.id;
+    const stored = localStorage.getItem(STORAGE_KEYS.CONSENT_RECORDS);
+    if (!stored) return [];
+    try {
+      const records: ConsentRecord[] = JSON.parse(stored);
+      if (!Array.isArray(records)) return [];
+      return targetUserId ? records.filter(r => r.user_id === targetUserId) : records;
+    } catch {
+      return [];
+    }
+  }
+
+  hasConsent(type: ConsentType, userId?: string): boolean {
+    const records = this.getConsentRecords(userId);
+    const match = records.find(r => r.consent_type === type);
+    return match ? match.status === "GRANTED" : false;
+  }
+
+  recordConsent(data: {
+    userId?: string;
+    type: ConsentType;
+    status: ConsentStatus;
+    purpose: string;
+  }): ConsentRecord {
+    const targetUserId = data.userId || this.getCurrentUser()?.id || "anon-user";
+    const allRecords = this.getConsentRecords();
+    
+    // Deactivate previous record of same type for user if any
+    const filtered = allRecords.filter(r => !(r.user_id === targetUserId && r.consent_type === data.type));
+
+    const newRecord: ConsentRecord = {
+      id: `cons-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      user_id: targetUserId,
+      consent_type: data.type,
+      status: data.status,
+      purpose: data.purpose,
+      ip_address: "127.0.0.1",
+      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "PWA Session",
+      granted_at: new Date().toISOString(),
+      revoked_at: data.status === "REVOKED" ? new Date().toISOString() : undefined,
+    };
+
+    const updated = [newRecord, ...filtered];
+    if (this.isBrowser()) {
+      localStorage.setItem(STORAGE_KEYS.CONSENT_RECORDS, JSON.stringify(updated));
+    }
+
+    this.addAuditLog({
+      user_id: targetUserId,
+      action: data.status === "GRANTED" ? "CONSENT_GRANTED" : "CONSENT_REVOKED",
+      resource_type: "CONSENT",
+      resource_id: newRecord.id,
+      details: { consent_type: data.type, status: data.status, purpose: data.purpose },
+    });
+
+    return newRecord;
+  }
+
+  revokeConsent(type: ConsentType, userId?: string): ConsentRecord | null {
+    return this.recordConsent({
+      userId,
+      type,
+      status: "REVOKED",
+      purpose: "User revoked explicit consent via Privacy Controls.",
+    });
+  }
+
+  // --- SECURITY AUDIT TRAIL ---
+  getAuditLogs(userId?: string): AuditLog[] {
+    if (!this.isBrowser()) return [];
+    const targetUserId = userId || this.getCurrentUser()?.id;
+    const stored = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
+    if (!stored) return [];
+    try {
+      const logs: AuditLog[] = JSON.parse(stored);
+      if (!Array.isArray(logs)) return [];
+      return targetUserId ? logs.filter(l => l.user_id === targetUserId) : logs;
+    } catch {
+      return [];
+    }
+  }
+
+  addAuditLog(log: Omit<AuditLog, "id" | "created_at">): AuditLog {
+    const targetUserId = log.user_id || this.getCurrentUser()?.id || "system";
+    const logs = this.getAuditLogs();
+    const newLog: AuditLog = {
+      ...log,
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      user_id: targetUserId,
+      created_at: new Date().toISOString(),
+    };
+
+    const updated = [newLog, ...logs.slice(0, 99)];
+    if (this.isBrowser()) {
+      localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(updated));
+    }
+    return newLog;
+  }
+
+  // --- USER DATA SOVEREIGNTY: LOCATION PURGE ---
+  purgeLocationHistory(userId?: string): { deletedPings: number; updatedDevices: number } {
+    const targetUserId = userId || this.getCurrentUser()?.id;
+    let deletedPings = 0;
+    let updatedDevices = 0;
+
+    if (!this.isBrowser()) return { deletedPings, updatedDevices };
+
+    // 1. Wipe telemetry pings for user's devices
+    const userDevices = this.getDevices(targetUserId);
+    const userDeviceIds = new Set(userDevices.map(d => d.id));
+
+    const storedPings = localStorage.getItem(STORAGE_KEYS.TELEMETRY_PINGS);
+    if (storedPings) {
+      try {
+        const allPings: Record<string, TelemetryPing[]> = JSON.parse(storedPings);
+        for (const devId of userDeviceIds) {
+          if (allPings[devId]) {
+            deletedPings += allPings[devId].length;
+            delete allPings[devId];
+          }
+        }
+        localStorage.setItem(STORAGE_KEYS.TELEMETRY_PINGS, JSON.stringify(allPings));
+      } catch {}
+    }
+
+    // 2. Clear coordinates on user's devices
+    const allDevs = this.getDevices();
+    const updatedDevs = allDevs.map(d => {
+      if (userDeviceIds.has(d.id)) {
+        updatedDevices++;
+        return {
+          ...d,
+          last_seen_lat: undefined,
+          last_seen_lng: undefined,
+          last_seen_location: "Location Cleared by User (Data Purged)",
+        };
+      }
+      return d;
+    });
+    localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(updatedDevs));
+
+    // 3. Mark location consent as revoked
+    this.revokeConsent("LOCATION_TRACKING", targetUserId);
+
+    // 4. Log privacy audit event
+    this.addAuditLog({
+      user_id: targetUserId || "owner",
+      action: "LOCATION_HISTORY_PURGED",
+      resource_type: "TELEMETRY",
+      details: { deleted_pings_count: deletedPings, scrubbed_devices_count: updatedDevices },
+    });
+
+    return { deletedPings, updatedDevices };
   }
 }
 

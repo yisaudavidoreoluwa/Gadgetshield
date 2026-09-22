@@ -77,6 +77,32 @@ export interface FleetAuditLog {
   details: string;
 }
 
+export type ConsentType = 'LOCATION_TRACKING' | 'TELEMETRY_HEARTBEAT' | 'RECOVERY_VERIFICATION' | 'AUDIT_LOGGING';
+export type ConsentStatus = 'GRANTED' | 'REVOKED' | 'DENIED';
+
+export interface ConsentRecord {
+  id: string;
+  user_id: string;
+  consent_type: ConsentType;
+  status: ConsentStatus;
+  purpose: string;
+  ip_address?: string;
+  user_agent?: string;
+  granted_at: string;
+  revoked_at?: string;
+}
+
+export interface AuditLog {
+  id: string;
+  user_id: string;
+  action: string;
+  resource_type: string;
+  resource_id?: string;
+  details: Record<string, any>;
+  ip_address?: string;
+  created_at: string;
+}
+
 export interface TelemetryPing {
   id: string;
   device_id: string;
@@ -89,12 +115,13 @@ export interface TelemetryPing {
   timestamp: string;
 }
 
-export type DecoyTemplate = 'icloud_alert' | 'carrier_sim' | 'dhl_delivery';
+export type DecoyTemplate = 'icloud_alert' | 'carrier_sim' | 'dhl_delivery' | 'custody_verify';
 
 export interface TrapCapture {
   id: string;
   trap_id: string;
   timestamp: string;
+  consent_acknowledged: boolean;
   latitude?: number;
   longitude?: number;
   accuracy?: number;

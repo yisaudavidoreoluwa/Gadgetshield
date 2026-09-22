@@ -15,7 +15,8 @@ import {
   Battery,
   Globe,
   Truck,
-  Plus
+  Plus,
+  ShieldCheck
 } from "lucide-react";
 import { Device, DecoyTrap, DecoyTemplate, TrapCapture } from "@/lib/types/database";
 import { hybridStore } from "@/lib/storage/hybrid-store";
@@ -94,10 +95,10 @@ export default function DeployTrapModal({
               </span>
             </div>
             <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-              Deploy Forensic Recovery Trap
+              Deploy Forensic Recovery Link
             </h2>
             <p className="text-xs text-zinc-400">
-              Generate covert deceptive URLs that stealthily capture the thief’s precise GPS, IP, and hardware metadata upon click.
+              Generate lure recovery links with upfront transparent telemetry disclosures (GPS, IP, OS, Purpose & 30-Day Retention).
             </p>
           </div>
 
@@ -263,6 +264,17 @@ export default function DeployTrapModal({
                 <p className="text-zinc-300 font-mono text-[11px] leading-relaxed">
                   "{getDeceptivePretext(selectedTemplate)}"
                 </p>
+              </div>
+
+              {/* Upfront Transparent Disclosure Notice */}
+              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs">
+                <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5 text-[11px]">
+                  <span className="font-semibold text-white">Upfront Privacy & Legal Compliance:</span>
+                  <p className="text-white/70">
+                    Prior to capturing GPS coordinates or device telemetry, visitors see an explicit disclosure modal detailing what is collected (GPS, IP, OS), lawful recovery purpose, and 30-day retention rules.
+                  </p>
+                </div>
               </div>
             </div>
           )}

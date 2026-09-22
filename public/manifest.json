@@ -1,0 +1,19 @@
+{
+  "name": "Gadgetshield - Asset Defense & Ownership Registry",
+  "short_name": "Gadgetshield",
+  "description": "Cryptographically anchored gadget ownership deeds, anti-theft tracking, and instant police recovery engine.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "security", "productivity"]
+}

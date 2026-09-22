@@ -173,6 +173,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setProfile(prof);
             setRole(prof.role);
             hybridStore.setCurrentSession(data.user, prof);
+            hybridStore.addAuditLog({
+              user_id: data.user.id,
+              action: "ACCOUNT_AUTHENTICATED",
+              resource_type: "SESSION",
+              details: { method: "supabase_password", role: prof.role },
+            });
           }
           setIsLoading(false);
           return { error: null };
@@ -198,6 +204,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(existingAccount.profile);
       setRole(existingAccount.profile.role);
       hybridStore.setCurrentSession(existingAccount.user, existingAccount.profile);
+      hybridStore.addAuditLog({
+        user_id: existingAccount.user.id,
+        action: "ACCOUNT_AUTHENTICATED",
+        resource_type: "SESSION",
+        details: { method: "hybrid_password", role: existingAccount.profile.role },
+      });
       setIsLoading(false);
       return { error: null };
     }
@@ -313,6 +325,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile(localProfile);
           setRole(metadata.role);
           hybridStore.setCurrentSession(data.user, localProfile);
+          hybridStore.addAuditLog({
+            user_id: data.user.id,
+            action: "ACCOUNT_REGISTERED",
+            resource_type: "PROFILE",
+            details: { role: metadata.role, email: localProfile.email },
+          });
           setIsLoading(false);
           return { error: null };
         }
@@ -327,6 +345,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(localProfile);
     setRole(metadata.role);
     hybridStore.setCurrentSession(localUser, localProfile);
+    hybridStore.addAuditLog({
+      user_id: localUser.id,
+      action: "ACCOUNT_REGISTERED",
+      resource_type: "PROFILE",
+      details: { role: metadata.role, email: localProfile.email },
+    });
 
     setIsLoading(false);
     return { error: null };

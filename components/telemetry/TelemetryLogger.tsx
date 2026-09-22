@@ -58,8 +58,10 @@ export default function TelemetryLogger() {
       }
     };
 
-    // Passive low-power location request if supported and granted
-    if ("geolocation" in navigator) {
+    // Privacy-First Rule: Geolocation is requested ONLY if user has granted explicit consent
+    const hasLocationConsent = hybridStore.hasConsent("LOCATION_TRACKING");
+
+    if (hasLocationConsent && "geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           recordPing(
@@ -69,8 +71,7 @@ export default function TelemetryLogger() {
           );
         },
         () => {
-          // Geolocation denied or unavailable; log network IP-based heartbeat
-          recordPing();
+          // Graceful fallback if permission prompt is dismissed
         },
         {
           enableHighAccuracy: false, // Low-power / zero battery drain
@@ -78,8 +79,6 @@ export default function TelemetryLogger() {
           maximumAge: 1000 * 60 * 10, // Cache up to 10 mins
         }
       );
-    } else {
-      recordPing();
     }
   }, []);
 

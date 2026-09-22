@@ -23,6 +23,7 @@ import StolenDocketModal from "@/components/owner/StolenDocketModal";
 import TransferDeedModal from "@/components/owner/TransferDeedModal";
 import TelemetryDrawer from "@/components/telemetry/TelemetryDrawer";
 import DeployTrapModal from "@/components/owner/DeployTrapModal";
+import PrivacySettingsModal from "@/components/privacy/PrivacySettingsModal";
 import { formatImei, formatDateTime } from "@/lib/utils/formatters";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { hybridStore } from "@/lib/storage/hybrid-store";
@@ -33,6 +34,7 @@ export default function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState<boolean>(true);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [activeDocketDevice, setActiveDocketDevice] = useState<Device | null>(null);
   const [activeTransferDevice, setActiveTransferDevice] = useState<Device | null>(null);
   const [activeTelemetryDevice, setActiveTelemetryDevice] = useState<Device | null>(null);
@@ -134,13 +136,22 @@ export default function DevicesPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsRegisterOpen(true)}
-          className="bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-semibold px-5 py-2.5 rounded-full flex items-center gap-2 transition shadow-md"
-        >
-          <Plus className="w-4 h-4" />
-          Register New Device
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => setIsPrivacyOpen(true)}
+            className="glass-pill text-zinc-300 hover:text-white text-xs font-semibold px-4 py-2.5 rounded-full flex items-center gap-1.5 transition border border-white/10 hover:border-white/20"
+          >
+            <Lock className="w-3.5 h-3.5 text-purple-400" />
+            Privacy & Consent Hub
+          </button>
+          <button
+            onClick={() => setIsRegisterOpen(true)}
+            className="bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-semibold px-5 py-2.5 rounded-full flex items-center gap-2 transition shadow-md"
+          >
+            <Plus className="w-4 h-4" />
+            Register New Device
+          </button>
+        </div>
       </div>
 
       {/* Loading Skeleton */}
@@ -357,6 +368,13 @@ export default function DevicesPage() {
           device={activeTrapDevice}
         />
       )}
+
+      {/* Privacy & Data Sovereignty Hub Modal */}
+      <PrivacySettingsModal
+        isOpen={isPrivacyOpen}
+        onClose={() => setIsPrivacyOpen(false)}
+        onDataPurged={loadDevices}
+      />
     </div>
   );
 }

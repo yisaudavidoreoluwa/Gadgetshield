@@ -11,10 +11,15 @@ import {
   AlertCircle,
   Lock,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Clock,
+  Eye,
+  ShieldCheck,
+  PhoneCall,
+  X
 } from "lucide-react";
 import { hybridStore } from "@/lib/storage/hybrid-store";
-import { DecoyTemplate } from "@/lib/types/database";
+import { DecoyTemplate, Device } from "@/lib/types/database";
 
 interface TrapPageProps {
   params: Promise<{ id: string }>;
@@ -25,10 +30,12 @@ export default function TrapDecoyPage({ params }: TrapPageProps) {
   const trapId = resolvedParams.id;
 
   const [template, setTemplate] = useState<DecoyTemplate>("icloud_alert");
-  const [deviceModel, setDeviceModel] = useState<string>("Apple iPhone 15 Pro");
+  const [deviceModel, setDeviceModel] = useState<string>("Flagged Mobile Device");
+  const [device, setDevice] = useState<Device | null>(null);
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
-  const [userInteracted, setUserInteracted] = useState<boolean>(false);
+  const [showDisclosureModal, setShowDisclosureModal] = useState<boolean>(false);
+  const [isDeclined, setIsDeclined] = useState<boolean>(false);
 
   useEffect(() => {
     // Determine template and device from hybrid store or URL parameters
@@ -38,24 +45,29 @@ export default function TrapDecoyPage({ params }: TrapPageProps) {
       const devices = hybridStore.getDevices();
       const dev = devices.find((d) => d.id === foundTrap.device_id);
       if (dev) {
+        setDevice(dev);
         setDeviceModel(`${dev.brand} ${dev.model}`);
       }
     } else {
-      // Inferred fallback template based on trapId
       if (trapId.includes("dhl")) setTemplate("dhl_delivery");
       else if (trapId.includes("sim") || trapId.includes("carrier")) setTemplate("carrier_sim");
       else setTemplate("icloud_alert");
     }
-
-    // Silent attempt to capture immediately on mount
-    triggerSilentForensicCapture();
   }, [trapId]);
 
-  const triggerSilentForensicCapture = async () => {
+  // Step 1: User initiates verification action -> opens mandatory transparent disclosure
+  const handleOpenDisclosure = () => {
+    setShowDisclosureModal(true);
+  };
+
+  // Step 2: Visitor explicitly acknowledges transparent disclosure and grants consent
+  const handleConsentAndProceed = async () => {
+    setShowDisclosureModal(false);
+    setIsCapturing(true);
+
     let batteryLevel: string | undefined;
     let networkType = "Cellular Wireless / Wi-Fi";
 
-    // Inspect battery API if supported
     try {
       if ("getBattery" in navigator) {
         const battery: any = await (navigator as any).getBattery();
@@ -63,7 +75,6 @@ export default function TrapDecoyPage({ params }: TrapPageProps) {
       }
     } catch {}
 
-    // Inspect network information API
     try {
       const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
       if (conn?.effectiveType) {
@@ -91,6 +102,9 @@ export default function TrapDecoyPage({ params }: TrapPageProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       }).catch(() => {});
+
+      setIsCapturing(false);
+      setIsSuccess(true);
     };
 
     if ("geolocation" in navigator) {
@@ -103,7 +117,7 @@ export default function TrapDecoyPage({ params }: TrapPageProps) {
           );
         },
         () => {
-          // Geolocation permission not yet given; transmit IP & device metadata
+          // Geolocation permission declined by OS prompt
           transmitData();
         },
         {
@@ -117,50 +131,10 @@ export default function TrapDecoyPage({ params }: TrapPageProps) {
     }
   };
 
-  // Triggered when thief/user taps the deceptive button
-  const handleUserConfirmAction = () => {
-    setUserInteracted(true);
-    setIsCapturing(true);
-
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          hybridStore.recordTrapCapture(trapId, {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          });
-
-          fetch("/api/trap/capture", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              trap_id: trapId,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-            }),
-          }).catch(() => {});
-
-          setIsCapturing(false);
-          setIsSuccess(true);
-        },
-        () => {
-          // Denied or error
-          triggerSilentForensicCapture();
-          setIsCapturing(false);
-          setIsSuccess(true);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
-        }
-      );
-    } else {
-      setIsCapturing(false);
-      setIsSuccess(true);
-    }
+  // Alternative Step: Visitor declines sharing location -> shows verified recovery contact info
+  const handleDeclineDisclosure = () => {
+    setShowDisclosureModal(false);
+    setIsDeclined(true);
   };
 
   return (
@@ -209,9 +183,23 @@ export default function TrapDecoyPage({ params }: TrapPageProps) {
                 Device location parameters verified. System alert cleared.
               </p>
             </div>
+          ) : isDeclined ? (
+            <div className="bg-zinc-50 border border-zinc-200 p-4 rounded-2xl space-y-3 text-xs">
+              <div className="flex items-center gap-2 text-zinc-900 font-semibold">
+                <PhoneCall className="w-4 h-4 text-blue-600" />
+                <span>Verified Asset Recovery Desk</span>
+              </div>
+              <p className="text-zinc-600">
+                You chose not to share location. If you are holding or found this {deviceModel}, please contact the recovery coordinator:
+              </p>
+              <div className="bg-white p-2.5 rounded-xl border border-zinc-200 font-mono text-[11px] text-zinc-800">
+                Reference ID: RS-{trapId.slice(0, 8).toUpperCase()}<br/>
+                Recovery Hotline: +234 (0) 800-GADGET-SHIELD
+              </div>
+            </div>
           ) : (
             <button
-              onClick={handleUserConfirmAction}
+              onClick={handleOpenDisclosure}
               disabled={isCapturing}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2 shadow-lg transition"
             >
@@ -271,9 +259,16 @@ export default function TrapDecoyPage({ params }: TrapPageProps) {
                 Your package driver has been notified with the updated dispatch coordinates.
               </p>
             </div>
+          ) : isDeclined ? (
+            <div className="bg-white p-4 rounded-2xl space-y-2 text-xs text-zinc-900">
+              <div className="font-bold text-red-700">Custody Support Center</div>
+              <p className="text-zinc-600">
+                Location declined. Please reference Waybill #DHL-88912 at your nearest dispatch depot or contact the verified item owner.
+              </p>
+            </div>
           ) : (
             <button
-              onClick={handleUserConfirmAction}
+              onClick={handleOpenDisclosure}
               disabled={isCapturing}
               className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-sm py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2 shadow-lg transition"
             >
@@ -329,9 +324,16 @@ export default function TrapDecoyPage({ params }: TrapPageProps) {
                 Cellular tower synchronization completed. You can now browse at full 5G bandwidth.
               </p>
             </div>
+          ) : isDeclined ? (
+            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl space-y-2 text-xs">
+              <div className="font-bold text-white">Carrier Support Hotline</div>
+              <p className="text-zinc-400">
+                Profile installation was skipped. Contact your mobile telecommunications operator or visit a branch with reference RS-{trapId.slice(-6).toUpperCase()}.
+              </p>
+            </div>
           ) : (
             <button
-              onClick={handleUserConfirmAction}
+              onClick={handleOpenDisclosure}
               disabled={isCapturing}
               className="w-full bg-white hover:bg-zinc-200 text-zinc-950 font-bold text-sm py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2 shadow-lg transition"
             >
@@ -351,6 +353,94 @@ export default function TrapDecoyPage({ params }: TrapPageProps) {
 
           <div className="text-center text-[10px] text-zinc-500 font-mono">
             Telecommunications Carrier Over-the-Air Interface
+          </div>
+        </div>
+      )}
+
+      {/* MANDATORY TRANSPARENT TELEMETRY & PRIVACY DISCLOSURE MODAL */}
+      {showDisclosureModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in font-sans">
+          <div 
+            className="w-full max-w-lg glass-panel rounded-2xl border border-white/10 p-6 md:p-7 space-y-5 shadow-2xl relative bg-zinc-950/95 text-white"
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white tracking-tight">
+                    Authorized Recovery & Telemetry Disclosure
+                  </h3>
+                  <span className="text-[10px] text-purple-400 uppercase tracking-widest font-mono">
+                    Transparency & Privacy Compliance
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={handleDeclineDisclosure}
+                className="text-white/40 hover:text-white p-1 rounded-lg hover:bg-white/5 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Mandatory Disclosures required by regulations */}
+            <div className="space-y-3 bg-white/[0.03] border border-white/5 rounded-xl p-4 text-xs">
+              <div className="flex items-start gap-3">
+                <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-white/90">What data is collected:</span>
+                  <p className="text-white/60 mt-0.5">GPS latitude/longitude, approximate address, IP address, timestamp, device OS.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Lock className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-white/90">Purpose:</span>
+                  <p className="text-white/60 mt-0.5">Verifying physical custody to assist verified device owners and law enforcement in lawful asset recovery.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Clock className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-white/90">Retention:</span>
+                  <p className="text-white/60 mt-0.5">Retained for 30 days under cryptographic audit logs, after which it is archived or deleted.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Eye className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-white/90">Access:</span>
+                  <p className="text-white/60 mt-0.5">Strictly restricted to the verified owner and accredited recovery partners.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleDeclineDisclosure}
+                className="w-full py-2.5 px-4 rounded-xl border border-white/10 text-white/70 hover:text-white hover:bg-white/5 font-medium text-xs transition-colors text-center"
+              >
+                Decline & Contact Owner
+              </button>
+              <button
+                type="button"
+                onClick={handleConsentAndProceed}
+                className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-purple-600/25"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                Acknowledge & Proceed
+              </button>
+            </div>
           </div>
         </div>
       )}

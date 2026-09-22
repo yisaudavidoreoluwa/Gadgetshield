@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       id: `cap-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       trap_id,
       timestamp,
+      consent_acknowledged: true,
       latitude: latitude !== undefined ? Number(latitude) : undefined,
       longitude: longitude !== undefined ? Number(longitude) : undefined,
       accuracy: accuracy !== undefined ? Number(accuracy) : 10,
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
       const supabase = await createClient();
       await supabase.from("trap_captures").insert({
         trap_id,
+        consent_acknowledged: true,
         latitude: captureRecord.latitude,
         longitude: captureRecord.longitude,
         accuracy: captureRecord.accuracy,

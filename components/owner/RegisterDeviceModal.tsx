@@ -11,8 +11,12 @@ import {
   RefreshCw, 
   FileCheck,
   Sparkles,
-  Wand2
+  Wand2,
+  MapPin,
+  ShieldCheck,
+  Lock
 } from "lucide-react";
+import LocationConsentModal from "@/components/privacy/LocationConsentModal";
 import { 
   validateImeiLuhn, 
   calculateImeiCheckDigit, 
@@ -46,6 +50,60 @@ export default function RegisterDeviceModal({
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Privacy-first location consent state
+  const [showLocationConsent, setShowLocationConsent] = useState(false);
+  const [locationConsentGranted, setLocationConsentGranted] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+  const [locationStatusText, setLocationStatusText] = useState<string>("Not Attached (Privacy Opt-Out)");
+
+  const handleInitiateLocation = () => {
+    setShowLocationConsent(true);
+  };
+
+  const handleLocationConsentApproved = () => {
+    setShowLocationConsent(false);
+    setLocationConsentGranted(true);
+    setIsLocating(true);
+    setLocationStatusText("Acquiring GPS coordinates...");
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const coords = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          };
+          setLocationCoords(coords);
+          setLocationStatusText(`Stamping: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)} (±${Math.round(coords.accuracy || 10)}m)`);
+          setIsLocating(false);
+
+          hybridStore.recordConsent({
+            type: "LOCATION_TRACKING",
+            status: "GRANTED",
+            purpose: "Device registration origin verification on ownership deed.",
+          });
+        },
+        () => {
+          setIsLocating(false);
+          setLocationStatusText("Permission denied by browser. Proceeding without coordinates.");
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+      );
+    } else {
+      setIsLocating(false);
+      setLocationStatusText("Geolocation unavailable on this device.");
+    }
+  };
+
+  const handleLocationConsentDeclined = () => {
+    setShowLocationConsent(false);
+    setLocationConsentGranted(false);
+    setLocationCoords(null);
+    setLocationStatusText("Opted Out: Device will be registered without geographic coordinates.");
+  };
 
   if (!isOpen) return null;
 
@@ -136,6 +194,12 @@ export default function RegisterDeviceModal({
         serial_number: serialNumber.trim() || undefined,
         purchase_receipt_url: receiptUrl || undefined,
         status: "CLEAN" as const,
+        last_seen_at: locationCoords ? new Date().toISOString() : undefined,
+        last_seen_lat: locationCoords?.lat,
+        last_seen_lng: locationCoords?.lng,
+        last_seen_location: locationCoords 
+          ? `Registration Origin (${locationCoords.lat.toFixed(4)}, ${locationCoords.lng.toFixed(4)})`
+          : "Registration (Location Opt-Out)",
       };
 
       // 1. Guaranteed Hybrid Storage persistence
@@ -372,6 +436,40 @@ export default function RegisterDeviceModal({
             )}
           </div>
 
+          {/* Privacy-First Location Opt-In (GDPR / NDPR Compliant) */}
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${locationCoords ? "bg-emerald-500/20 text-emerald-400" : "bg-zinc-800 text-zinc-400"}`}>
+                  <MapPin className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold text-white">Geographic Possession Stamp (Optional)</h4>
+                  <p className="text-[10px] text-zinc-400">Anchor initial GPS coordinates to ownership deed</p>
+                </div>
+              </div>
+
+              {locationCoords ? (
+                <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" /> Stamped
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleInitiateLocation}
+                  disabled={isLocating}
+                  className="px-3 py-1 rounded-lg text-[11px] font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors"
+                >
+                  {isLocating ? "Locating..." : "Opt-In & Stamp"}
+                </button>
+              )}
+            </div>
+
+            <p className="text-[11px] text-zinc-400">
+              {locationStatusText}
+            </p>
+          </div>
+
           <div className="pt-2 flex gap-3">
             <button
               type="button"
@@ -400,6 +498,15 @@ export default function RegisterDeviceModal({
           </div>
         </form>
       </div>
+
+      {/* Explicit Location Consent Modal */}
+      <LocationConsentModal
+        isOpen={showLocationConsent}
+        onConsent={handleLocationConsentApproved}
+        onDecline={handleLocationConsentDeclined}
+        title="Stamp Geographic Coordinates on Deed"
+        contextMessage="Attaching your current coordinates anchors physical custody to your initial registration certificate. This serves as cryptographic proof of ownership if your gadget is stolen."
+      />
     </div>
   );
 }
