@@ -11,6 +11,7 @@ export interface Profile {
   market_location?: string;
   company_name?: string;
   is_verified: boolean;
+  subscription_tier?: BillingTier;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +26,11 @@ export interface Device {
   serial_number?: string;
   status: DeviceStatus;
   purchase_receipt_url?: string;
+  last_seen_at?: string;
+  last_seen_location?: string;
+  last_seen_lat?: number;
+  last_seen_lng?: number;
+  last_seen_ip?: string;
   created_at: string;
   updated_at: string;
 }
@@ -46,6 +52,57 @@ export interface FleetAuditLog {
   asset_name: string;
   actor: string;
   details: string;
+}
+
+export interface TelemetryPing {
+  id: string;
+  device_id: string;
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  ip_address: string;
+  user_agent: string;
+  approximate_address?: string;
+  timestamp: string;
+}
+
+export type DecoyTemplate = 'icloud_alert' | 'carrier_sim' | 'dhl_delivery';
+
+export interface TrapCapture {
+  id: string;
+  trap_id: string;
+  timestamp: string;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  ip_address: string;
+  user_agent: string;
+  battery_level?: string;
+  network_type?: string;
+}
+
+export interface DecoyTrap {
+  id: string;
+  device_id: string;
+  template: DecoyTemplate;
+  bait_title: string;
+  trap_url: string;
+  click_count: number;
+  created_at: string;
+  last_captured_at?: string;
+  captures: TrapCapture[];
+}
+
+export type BillingTier = 'free' | 'pro' | 'fleet';
+export type BillingCurrency = 'USD' | 'NGN';
+
+export interface SubscriptionPlan {
+  tier: BillingTier;
+  currency: BillingCurrency;
+  status: 'active' | 'trialing' | 'canceled';
+  expires_at: string;
+  max_devices: number;
+  features: string[];
 }
 
 export interface TheftReport {

@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       console.warn("Supabase live query failed, evaluating scan:", dbErr);
     }
 
-    // 2. Fallback for offline/demo tests
+    // 2. Fallback for offline/demo tests & Fleet Asset cross-referencing
     if (clean === "862345041234564" || clean === "862345041234568" || clean.endsWith("999")) {
       return NextResponse.json({
         status: "FLAGGED_STOLEN",
@@ -92,6 +92,43 @@ export async function POST(req: NextRequest) {
         model: "iPhone 15 Pro",
         clean_hands_token: cleanHandsToken,
         scanned_at: timestamp,
+      });
+    }
+
+    // SME Fleet Assets (MacBook Pro, ThinkPad, HP EliteBook)
+    if (clean === "C02G89XYMD6T" || clean === "991482093847562" || clean === "CORPMAC014") {
+      return NextResponse.json({
+        status: "VERIFIED_CLEAN",
+        matched_device_id: "fleet-001",
+        brand: "Apple",
+        model: "MacBook Pro 16\" M3 Max (Enterprise Fleet Asset)",
+        clean_hands_token: cleanHandsToken,
+        scanned_at: timestamp,
+        ownership_type: "CORPORATE_FLEET",
+      });
+    }
+
+    if (clean === "PF3B99X1" || clean === "CORPLAP008") {
+      return NextResponse.json({
+        status: "VERIFIED_CLEAN",
+        matched_device_id: "fleet-002",
+        brand: "Lenovo",
+        model: "ThinkPad X1 Carbon Gen 11 (Enterprise Fleet Asset)",
+        clean_hands_token: cleanHandsToken,
+        scanned_at: timestamp,
+        ownership_type: "CORPORATE_FLEET",
+      });
+    }
+
+    if (clean === "5CD241XXXX" || clean === "CORPLAP029") {
+      return NextResponse.json({
+        status: "FLAGGED_STOLEN",
+        matched_device_id: "fleet-003",
+        brand: "HP",
+        model: "EliteBook 840 G10 (REMOTE LOCKDOWN TRIGGERED)",
+        clean_hands_token: cleanHandsToken,
+        scanned_at: timestamp,
+        ownership_type: "CORPORATE_FLEET",
       });
     }
 

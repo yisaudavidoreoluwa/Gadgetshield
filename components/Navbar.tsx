@@ -13,7 +13,8 @@ import {
   Building2,
   Menu, 
   X,
-  ChevronDown
+  ChevronDown,
+  Sparkles
 } from "lucide-react";
 import { useAuth } from "@/lib/supabase/auth-context";
 
@@ -27,6 +28,7 @@ export default function Navbar() {
     { href: "/dashboard/fleet", label: "SME Fleet", icon: Building2 },
     { href: "/technician/scan", label: "Dealer & Tech Hub", icon: QrCode },
     { href: "/verify", label: "Public Search", icon: Search },
+    { href: "/pricing", label: "Plans", icon: Sparkles },
   ];
 
   const cycleRole = () => {

@@ -1,6 +1,19 @@
 "use client";
 
-import { Device, Profile, UserRole, FleetAsset, FleetAuditLog } from "@/lib/types/database";
+import { 
+  Device, 
+  Profile, 
+  UserRole, 
+  FleetAsset, 
+  FleetAuditLog,
+  TelemetryPing,
+  DecoyTrap,
+  TrapCapture,
+  DecoyTemplate,
+  SubscriptionPlan,
+  BillingTier,
+  BillingCurrency
+} from "@/lib/types/database";
 
 const STORAGE_KEYS = {
   USER: "rupalshield_user",
@@ -9,6 +22,9 @@ const STORAGE_KEYS = {
   FLEET_ASSETS: "rupalshield_fleet_assets",
   FLEET_AUDIT_LOGS: "rupalshield_fleet_audit_logs",
   VERIFICATION_LOGS: "rupalshield_verification_logs",
+  TELEMETRY_PINGS: "rupalshield_telemetry_pings",
+  DECOY_TRAPS: "rupalshield_decoy_traps",
+  SUBSCRIPTION: "rupalshield_subscription",
 };
 
 // Seed consumer devices (100% valid Luhn IMEIs)
@@ -22,6 +38,11 @@ const DEFAULT_DEVICES: Device[] = [
     serial_number: "F2LLN0G9XXXX",
     status: "CLEAN",
     purchase_receipt_url: "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=600&auto=format&fit=crop&q=80",
+    last_seen_at: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+    last_seen_location: "Victoria Island, Lagos (Active PWA Session)",
+    last_seen_lat: 6.4281,
+    last_seen_lng: 3.4219,
+    last_seen_ip: "102.89.41.201",
     created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -34,6 +55,11 @@ const DEFAULT_DEVICES: Device[] = [
     serial_number: "R5CW20XXXXX",
     status: "STOLEN",
     purchase_receipt_url: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=600&auto=format&fit=crop&q=80",
+    last_seen_at: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
+    last_seen_location: "Computer Village, Ikeja (Decoy Honeypot Trap)",
+    last_seen_lat: 6.5965,
+    last_seen_lng: 3.3421,
+    last_seen_ip: "197.210.54.112",
     created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
     updated_at: new Date().toISOString(),
   }
@@ -55,6 +81,11 @@ const DEFAULT_FLEET_ASSETS: FleetAsset[] = [
     department: "Engineering / AI Core",
     assigned_at: new Date(Date.now() - 86400000 * 90).toISOString(),
     lockdown_status: "ACTIVE",
+    last_seen_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    last_seen_location: "San Francisco, CA (Corporate Fleet VPN)",
+    last_seen_lat: 37.7749,
+    last_seen_lng: -122.4194,
+    last_seen_ip: "198.51.100.42",
     created_at: new Date(Date.now() - 86400000 * 120).toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -138,6 +169,78 @@ const DEFAULT_FLEET_LOGS: FleetAuditLog[] = [
   }
 ];
 
+// Seed Telemetry Pings
+const DEFAULT_TELEMETRY: Record<string, TelemetryPing[]> = {
+  "dev-seed-001": [
+    {
+      id: "ping-001",
+      device_id: "dev-seed-001",
+      latitude: 6.4281,
+      longitude: 3.4219,
+      accuracy: 12,
+      ip_address: "102.89.41.201",
+      user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+      approximate_address: "Victoria Island, Lagos, Nigeria",
+      timestamp: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+    },
+    {
+      id: "ping-002",
+      device_id: "dev-seed-001",
+      latitude: 6.4350,
+      longitude: 3.4150,
+      accuracy: 15,
+      ip_address: "102.89.41.201",
+      user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+      approximate_address: "Adeola Odeku St, Victoria Island",
+      timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
+    }
+  ]
+};
+
+// Seed Decoy Honeypot Traps
+const DEFAULT_DECOY_TRAPS: DecoyTrap[] = [
+  {
+    id: "trap-demo-s24",
+    device_id: "dev-seed-002",
+    template: "icloud_alert",
+    bait_title: "Samsung Cloud // Device Recovery Alert Notice",
+    trap_url: "/trap/trap-demo-s24",
+    click_count: 2,
+    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+    last_captured_at: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
+    captures: [
+      {
+        id: "cap-001",
+        trap_id: "trap-demo-s24",
+        timestamp: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
+        latitude: 6.5965,
+        longitude: 3.3421,
+        accuracy: 8,
+        ip_address: "197.210.54.112",
+        user_agent: "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 Chrome/128.0",
+        battery_level: "64%",
+        network_type: "Cellular 5G (MTN Nigeria)"
+      }
+    ]
+  }
+];
+
+const DEFAULT_SUBSCRIPTION: SubscriptionPlan = {
+  tier: "pro",
+  currency: "USD",
+  status: "active",
+  expires_at: new Date(Date.now() + 86400000 * 365).toISOString(),
+  max_devices: 100,
+  features: [
+    "Unlimited Hardware Registry Deeds",
+    "Active Session GPS & IP Telemetry (TEL-01)",
+    "Decoy Honeypot Recovery Traps (REC-01)",
+    "Police Incident Clearance Dockets",
+    "Cryptographic QR Code Hash Certificate (REG-02)",
+    "Sub-150ms Telemetry Ingestion"
+  ]
+};
+
 class HybridStore {
   private isBrowser(): boolean {
     return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -211,6 +314,7 @@ class HybridStore {
       company_name: companyName,
       market_location: role === "technician" ? "Computer Village Cluster 14" : undefined,
       is_verified: true,
+      subscription_tier: "pro",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -235,11 +339,18 @@ class HybridStore {
     }
   }
 
+  getDeviceById(id: string): Device | null {
+    const devices = this.getDevices();
+    return devices.find(d => d.id === id) || null;
+  }
+
   addDevice(deviceData: Omit<Device, "id" | "created_at" | "updated_at">): Device {
     const devices = this.getDevices();
     const newDevice: Device = {
       ...deviceData,
       id: `dev-${Date.now()}`,
+      last_seen_at: new Date().toISOString(),
+      last_seen_location: "Registered Web Session (Verified Origin)",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -309,6 +420,230 @@ class HybridStore {
     }
 
     return merged;
+  }
+
+  // --- TELEMETRY ENGINE (TEL-01) ---
+  getTelemetryPings(deviceId: string): TelemetryPing[] {
+    if (!this.isBrowser()) return DEFAULT_TELEMETRY[deviceId] || [];
+    const stored = localStorage.getItem(STORAGE_KEYS.TELEMETRY_PINGS);
+    if (!stored) {
+      localStorage.setItem(STORAGE_KEYS.TELEMETRY_PINGS, JSON.stringify(DEFAULT_TELEMETRY));
+      return DEFAULT_TELEMETRY[deviceId] || [];
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      return parsed[deviceId] || [];
+    } catch {
+      return DEFAULT_TELEMETRY[deviceId] || [];
+    }
+  }
+
+  recordTelemetryPing(deviceId: string, pingData: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    ip_address?: string;
+    user_agent?: string;
+    approximate_address?: string;
+  }): TelemetryPing {
+    const allPings: Record<string, TelemetryPing[]> = (() => {
+      if (!this.isBrowser()) return DEFAULT_TELEMETRY;
+      const stored = localStorage.getItem(STORAGE_KEYS.TELEMETRY_PINGS);
+      try {
+        return stored ? JSON.parse(stored) : DEFAULT_TELEMETRY;
+      } catch {
+        return DEFAULT_TELEMETRY;
+      }
+    })();
+
+    const newPing: TelemetryPing = {
+      id: `ping-${Date.now()}`,
+      device_id: deviceId,
+      latitude: pingData.latitude,
+      longitude: pingData.longitude,
+      accuracy: pingData.accuracy || 10,
+      ip_address: pingData.ip_address || "127.0.0.1",
+      user_agent: pingData.user_agent || (typeof navigator !== "undefined" ? navigator.userAgent : "Browser Session"),
+      approximate_address: pingData.approximate_address || "GPS Position Logged",
+      timestamp: new Date().toISOString(),
+    };
+
+    const devicePings = allPings[deviceId] || [];
+    allPings[deviceId] = [newPing, ...devicePings.slice(0, 30)];
+
+    if (this.isBrowser()) {
+      localStorage.setItem(STORAGE_KEYS.TELEMETRY_PINGS, JSON.stringify(allPings));
+
+      // Also update device's last_seen fields
+      const devices = this.getDevices();
+      const updated = devices.map(d => {
+        if (d.id === deviceId) {
+          return {
+            ...d,
+            last_seen_at: newPing.timestamp,
+            last_seen_location: newPing.approximate_address,
+            last_seen_lat: newPing.latitude,
+            last_seen_lng: newPing.longitude,
+            last_seen_ip: newPing.ip_address
+          };
+        }
+        return d;
+      });
+      localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(updated));
+    }
+
+    return newPing;
+  }
+
+  // --- DECOY HONEYPOT RECOVERY TRAPS (REC-01) ---
+  getDecoyTraps(deviceId?: string): DecoyTrap[] {
+    let traps = DEFAULT_DECOY_TRAPS;
+    if (this.isBrowser()) {
+      const stored = localStorage.getItem(STORAGE_KEYS.DECOY_TRAPS);
+      if (stored) {
+        try {
+          traps = JSON.parse(stored);
+        } catch {
+          traps = DEFAULT_DECOY_TRAPS;
+        }
+      } else {
+        localStorage.setItem(STORAGE_KEYS.DECOY_TRAPS, JSON.stringify(DEFAULT_DECOY_TRAPS));
+      }
+    }
+
+    return deviceId ? traps.filter(t => t.device_id === deviceId) : traps;
+  }
+
+  getDecoyTrapById(trapId: string): DecoyTrap | null {
+    const traps = this.getDecoyTraps();
+    return traps.find(t => t.id === trapId) || null;
+  }
+
+  createDecoyTrap(deviceId: string, template: DecoyTemplate): DecoyTrap {
+    const traps = this.getDecoyTraps();
+    const trapId = `trap-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+    let baitTitle = "Emergency Hardware Security Alert";
+    if (template === "icloud_alert") baitTitle = "iCloud // Urgent Location Found Verification";
+    else if (template === "dhl_delivery") baitTitle = "DHL Express // Package Delivery Tracking Update";
+    else if (template === "carrier_sim") baitTitle = "Carrier SIM // Network Provisioning Certificate";
+
+    const newTrap: DecoyTrap = {
+      id: trapId,
+      device_id: deviceId,
+      template,
+      bait_title: baitTitle,
+      trap_url: `/trap/${trapId}`,
+      click_count: 0,
+      created_at: new Date().toISOString(),
+      captures: []
+    };
+
+    const updated = [newTrap, ...traps];
+    if (this.isBrowser()) {
+      localStorage.setItem(STORAGE_KEYS.DECOY_TRAPS, JSON.stringify(updated));
+    }
+    return newTrap;
+  }
+
+  recordTrapCapture(trapId: string, captureData: {
+    latitude?: number;
+    longitude?: number;
+    accuracy?: number;
+    ip_address?: string;
+    user_agent?: string;
+    battery_level?: string;
+    network_type?: string;
+  }): TrapCapture | null {
+    const traps = this.getDecoyTraps();
+    let recordedCapture: TrapCapture | null = null;
+
+    const updated = traps.map(trap => {
+      if (trap.id === trapId) {
+        recordedCapture = {
+          id: `cap-${Date.now()}`,
+          trap_id: trapId,
+          timestamp: new Date().toISOString(),
+          latitude: captureData.latitude,
+          longitude: captureData.longitude,
+          accuracy: captureData.accuracy || 10,
+          ip_address: captureData.ip_address || "127.0.0.1",
+          user_agent: captureData.user_agent || "Mobile Browser",
+          battery_level: captureData.battery_level,
+          network_type: captureData.network_type || "Cellular Wireless"
+        };
+
+        const updatedCaptures = [recordedCapture, ...trap.captures];
+        return {
+          ...trap,
+          click_count: trap.click_count + 1,
+          last_captured_at: recordedCapture.timestamp,
+          captures: updatedCaptures
+        };
+      }
+      return trap;
+    });
+
+    if (this.isBrowser()) {
+      localStorage.setItem(STORAGE_KEYS.DECOY_TRAPS, JSON.stringify(updated));
+
+      // Also update device last seen if coordinates were obtained
+      if (recordedCapture && (recordedCapture as TrapCapture).latitude) {
+        const foundTrap = traps.find(t => t.id === trapId);
+        if (foundTrap) {
+          const cap = recordedCapture as TrapCapture;
+          const devices = this.getDevices();
+          const updatedDevs = devices.map(d => {
+            if (d.id === foundTrap.device_id) {
+              return {
+                ...d,
+                last_seen_at: cap.timestamp,
+                last_seen_location: `Honeypot Trap Capture (${cap.network_type || "Mobile Device"})`,
+                last_seen_lat: cap.latitude,
+                last_seen_lng: cap.longitude,
+                last_seen_ip: cap.ip_address
+              };
+            }
+            return d;
+          });
+          localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(updatedDevs));
+        }
+      }
+    }
+
+    return recordedCapture;
+  }
+
+  // --- TIERED SAAS SUBSCRIPTION (BIL-01) ---
+  getSubscription(): SubscriptionPlan {
+    if (!this.isBrowser()) return DEFAULT_SUBSCRIPTION;
+    const stored = localStorage.getItem(STORAGE_KEYS.SUBSCRIPTION);
+    if (!stored) {
+      localStorage.setItem(STORAGE_KEYS.SUBSCRIPTION, JSON.stringify(DEFAULT_SUBSCRIPTION));
+      return DEFAULT_SUBSCRIPTION;
+    }
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return DEFAULT_SUBSCRIPTION;
+    }
+  }
+
+  upgradeSubscription(tier: BillingTier, currency: BillingCurrency): SubscriptionPlan {
+    const current = this.getSubscription();
+    const updated: SubscriptionPlan = {
+      ...current,
+      tier,
+      currency,
+      status: "active",
+      expires_at: new Date(Date.now() + 86400000 * 365).toISOString(),
+      max_devices: tier === "free" ? 1 : tier === "pro" ? 100 : 10000
+    };
+
+    if (this.isBrowser()) {
+      localStorage.setItem(STORAGE_KEYS.SUBSCRIPTION, JSON.stringify(updated));
+    }
+    return updated;
   }
 
   // --- SME FLEET MANAGEMENT METHODS ---
@@ -469,7 +804,7 @@ class HybridStore {
     return newLog;
   }
 
-  // --- SCANNER IDENTIFIER LOOKUP (CROSS-REFERENCING CONSUMER + FLEET) ---
+  // --- SCANNER IDENTIFIER LOOKUP ---
   lookupDeviceByIdentifier(identifier: string): { status: "VERIFIED_CLEAN" | "UNREGISTERED" | "FLAGGED_STOLEN"; device?: Device } {
     const cleaned = identifier.replace(/[^0-9A-Za-z]/g, "");
 
@@ -500,7 +835,6 @@ class HybridStore {
     );
 
     if (!matched) {
-      // Fallback checks for demo testing
       if (cleaned === "862345041234564" || cleaned === "862345041234568") {
         return {
           status: "FLAGGED_STOLEN",

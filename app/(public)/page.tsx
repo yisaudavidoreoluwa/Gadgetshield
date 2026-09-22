@@ -83,6 +83,13 @@ export default function HomePage() {
             <Search className="w-4 h-4" />
             Public Search
           </Link>
+          <Link
+            href="/pricing"
+            className="glass-pill text-zinc-300 hover:text-white px-6 py-3.5 rounded-full flex items-center gap-2 transition-all hover:bg-zinc-800/50"
+          >
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            Plans & Pricing
+          </Link>
         </div>
 
         {/* METRICS STRIP */}
