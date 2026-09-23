@@ -82,8 +82,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check if Supabase keys exist
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const configured = Boolean(url && !url.includes("placeholder") && anonKey && !anonKey.includes("placeholder"));
+    const key =
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const configured = Boolean(url && !url.includes("placeholder") && key && !key.includes("placeholder"));
     setIsConfigured(configured);
 
     // Initial session load from hybrid store or Supabase
