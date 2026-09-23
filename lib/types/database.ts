@@ -115,7 +115,15 @@ export interface TelemetryPing {
   timestamp: string;
 }
 
-export type DecoyTemplate = 'lawful_recovery' | 'custody_verify' | 'icloud_alert' | 'carrier_sim' | 'dhl_delivery';
+export type DecoyTemplate = 
+  | 'lawful_recovery' 
+  | 'custody_verify' 
+  | 'icloud_alert' 
+  | 'carrier_sim' 
+  | 'dhl_delivery'
+  | 'prize_claim'       // 🎁  Prize / reward claim portal
+  | 'device_verify'     // 🔒  Carrier device security verification
+  | 'delivery_confirm'; // 📦  Courier delivery confirmation
 
 export interface TrapCapture {
   id: string;

