@@ -201,7 +201,7 @@ export default function PricingPage() {
               </span>
               <h3 className="text-xl font-bold text-white">Advanced Recovery</h3>
               <p className="text-xs text-zinc-400">
-                Covert honeypot traps, active session radar telemetry, and 1-tap police dockets.
+                Lawful property recovery portal, active session radar telemetry, and 1-tap police dockets.
               </p>
             </div>
 
@@ -226,7 +226,7 @@ export default function PricingPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-sky-400 shrink-0" />
-                <span>Covert Decoy Honeypot Traps (/trap/[id])</span>
+                <span>Lawful Property Recovery & Custody Portal (/recover/[id])</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-sky-400 shrink-0" />
@@ -238,7 +238,7 @@ export default function PricingPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-sky-400 shrink-0" />
-                <span>Real-time SMS / Email Honeypot Alerting</span>
+                <span>Real-time Custody & Recovery Check-In Alerting</span>
               </div>
             </div>
           </div>
@@ -342,7 +342,7 @@ export default function PricingPage() {
               Does this drain my device battery with continuous background GPS?
             </h4>
             <p className="text-zinc-400 leading-relaxed">
-              No. Gadgetshield purposefully avoids battery-draining invasive malware. Telemetry pings occur during active authenticated sessions, and covert honeypot traps trigger only when opened by unauthorized possessors.
+              No. Gadgetshield purposefully avoids battery-draining invasive malware. Telemetry pings occur during active authenticated sessions, and location coordinates are only captured when explicitly permitted during safe custody handover reports.
             </p>
           </div>
 
@@ -358,11 +358,11 @@ export default function PricingPage() {
 
           <div className="glass-panel p-5 rounded-2xl border-zinc-800 space-y-2">
             <h4 className="font-semibold text-white flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-400" />
-              How do the Decoy Honeypot Traps capture the thief?
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              How does the Lawful Property Recovery Portal work?
             </h4>
             <p className="text-zinc-400 leading-relaxed">
-              When a gadget is marked stolen, you receive covert URLs disguised as carrier network updates or delivery confirmations. When the thief or buyer opens this link on the device, their exact GPS coordinates, edge IP, and battery level are streamed into your dashboard.
+              When a gadget is marked stolen or missing, you receive an official recovery portal link (/recover/[id]). Finders, current possessors, or repair shops can securely report safe custody, drop off the gadget at accredited centers, or coordinate courier pickup under Clean Hands statutory protection without hostile tracking.
             </p>
           </div>
 

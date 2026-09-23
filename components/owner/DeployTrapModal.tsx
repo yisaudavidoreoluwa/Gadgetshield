@@ -6,17 +6,20 @@ import {
   Copy, 
   Check, 
   ExternalLink, 
-  ShieldAlert, 
   Radio, 
   Smartphone, 
   MapPin, 
   AlertTriangle,
   Zap,
-  Battery,
   Globe,
-  Truck,
   Plus,
-  ShieldCheck
+  ShieldCheck,
+  FileCheck,
+  Building2,
+  Award,
+  Truck,
+  MessageSquare,
+  HelpCircle
 } from "lucide-react";
 import { Device, DecoyTrap, DecoyTemplate, TrapCapture } from "@/lib/types/database";
 import { hybridStore } from "@/lib/storage/hybrid-store";
@@ -34,7 +37,7 @@ export default function DeployTrapModal({
   device,
 }: DeployTrapModalProps) {
   const [traps, setTraps] = useState<DecoyTrap[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<DecoyTemplate>("icloud_alert");
+  const [selectedNoticeType, setSelectedNoticeType] = useState<"registry_notice" | "finder_reward" | "dealer_alert">("registry_notice");
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [copiedPretext, setCopiedPretext] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -42,24 +45,32 @@ export default function DeployTrapModal({
   useEffect(() => {
     if (!isOpen || !device) return;
     const existingTraps = hybridStore.getDecoyTraps(device.id);
-    setTraps(existingTraps);
+    if (existingTraps.length === 0) {
+      // Auto-create initial recovery portal link if not yet generated
+      const newTrap = hybridStore.createDecoyTrap(device.id, "lawful_recovery");
+      setTraps([newTrap]);
+    } else {
+      setTraps(existingTraps);
+    }
   }, [isOpen, device]);
 
   if (!isOpen || !device) return null;
 
-  const handleGenerateTrap = () => {
+  const handleGenerateNewLink = () => {
     setIsGenerating(true);
     setTimeout(() => {
-      const newTrap = hybridStore.createDecoyTrap(device.id, selectedTemplate);
+      const newTrap = hybridStore.createDecoyTrap(device.id, "lawful_recovery");
       const updated = hybridStore.getDecoyTraps(device.id);
       setTraps(updated);
       setIsGenerating(false);
-    }, 400);
+    }, 300);
   };
 
   const activeTrap = traps[0];
   const origin = typeof window !== "undefined" ? window.location.origin : "https://rupalshield.vercel.app";
-  const fullTrapUrl = activeTrap ? `${origin}${activeTrap.trap_url}` : "";
+  const recoveryUrl = activeTrap 
+    ? (activeTrap.trap_url.startsWith("/recover") ? `${origin}${activeTrap.trap_url}` : `${origin}/recover/${activeTrap.id}`)
+    : `${origin}/recover/${device.id}`;
 
   const copyToClipboard = (text: string, isLink: boolean) => {
     navigator.clipboard.writeText(text);
@@ -72,33 +83,34 @@ export default function DeployTrapModal({
     }
   };
 
-  // Pretext message recommendations to send via SMS / WhatsApp / Telegram
-  const getDeceptivePretext = (template: DecoyTemplate) => {
-    if (template === "icloud_alert") {
-      return `[Apple Security Alert]: A location request was initiated for your ${device.brand} ${device.model}. If this was you, confirm your identity here: ${fullTrapUrl}`;
+  // Legitimate, non-deceptive messaging templates
+  const getNoticeMessage = (type: "registry_notice" | "finder_reward" | "dealer_alert") => {
+    if (type === "registry_notice") {
+      return `Gadgetshield Recovery Notice: A recovery case has been opened for this ${device.brand} ${device.model} (IMEI ending in ${device.imei_primary.slice(-4)}). If you have found or are currently holding this gadget, please visit the official safe custody portal to coordinate return and claim the verified return reward: ${recoveryUrl}`;
     }
-    if (template === "dhl_delivery") {
-      return `DHL Express Alert: Courier was unable to complete delivery for parcel #DHL-88912 due to address mismatch. Please pin your current location here to receive package: ${fullTrapUrl}`;
+    if (type === "finder_reward") {
+      return `Hello, my ${device.brand} ${device.model} was misplaced or taken. An official return reward has been pledged on the Gadgetshield National Registry. Please visit this safe custody portal to claim the reward and arrange drop-off: ${recoveryUrl}`;
     }
-    return `Carrier Network Alert: Over-the-air 5G profile configuration required to keep high-speed mobile data active on this SIM. Install carrier profile: ${fullTrapUrl}`;
+    return `Attention Workshop / Electronics Counter: This ${device.brand} ${device.model} is cryptographically registered to its verified owner and reported missing. Please log safe custody and issue a Clean Hands token here: ${recoveryUrl}`;
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-3xl max-h-[92vh] flex flex-col glass-panel rounded-3xl border border-zinc-700/80 shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-3xl max-h-[92vh] flex flex-col glass-panel rounded-3xl border border-zinc-700/80 shadow-2xl overflow-hidden bg-zinc-950/95">
+        
         {/* Header */}
         <div className="p-6 border-b border-zinc-800/80 flex items-start justify-between bg-zinc-900/50">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="bg-red-500/10 text-red-400 border border-red-500/30 text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase font-mono flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" /> Covert Honeypot Radar // REC-01
+              <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase font-mono flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" /> Lawful Recovery Portal // REC-01
               </span>
             </div>
             <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-              Deploy Forensic Recovery Link
+              Lawful Property Recovery & Custody Link
             </h2>
             <p className="text-xs text-zinc-400">
-              Generate lure recovery links with upfront transparent telemetry disclosures (GPS, IP, OS, Purpose & 30-Day Retention).
+              Generate a verified, non-deceptive recovery portal link where finders or current holders can safely report custody, select an accredited drop-off center, or coordinate handover.
             </p>
           </div>
 
@@ -112,188 +124,170 @@ export default function DeployTrapModal({
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-6">
-          {/* Device Target Card */}
+          {/* Target Hardware Summary */}
           <div className="glass-panel p-4 rounded-2xl border-zinc-700/60 flex justify-between items-center bg-zinc-900/40 text-xs">
             <div>
-              <span className="text-[10px] uppercase font-mono text-zinc-500">Target Stolen Hardware:</span>
+              <span className="text-[10px] uppercase font-mono text-zinc-500">Flagged Missing Gadget:</span>
               <div className="font-semibold text-white text-sm">{device.brand} {device.model}</div>
               <div className="text-zinc-400 font-mono">IMEI: {formatImei(device.imei_primary)}</div>
             </div>
             <div className="text-right">
               <span className="bg-amber-400/10 text-amber-300 border border-amber-400/30 text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase font-mono">
-                CRIME DOCKET ACTIVE
+                RECOVERY ACTIVE
               </span>
             </div>
           </div>
 
-          {/* Template Chooser */}
+          {/* Notice Tone Selector */}
           <div className="space-y-3">
             <label className="text-xs font-mono uppercase tracking-wider text-zinc-300 block">
-              1. Select Covert Deception Template:
+              1. Select Notice Message Tone:
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* iCloud */}
+              {/* Registry Notice */}
               <button
                 type="button"
-                onClick={() => setSelectedTemplate("icloud_alert")}
+                onClick={() => setSelectedNoticeType("registry_notice")}
                 className={`p-4 rounded-2xl text-left border transition flex flex-col justify-between space-y-2 ${
-                  selectedTemplate === "icloud_alert"
+                  selectedNoticeType === "registry_notice"
                     ? "bg-zinc-800 border-white text-white shadow-lg"
                     : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-sky-400" />
-                  <span className="text-xs font-bold">Apple iCloud</span>
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-bold">Official Registry Notice</span>
                 </div>
                 <p className="text-[11px] text-zinc-400 leading-tight">
-                  Disguised as an official Apple Security location confirmation prompt.
+                  Formal national registry notification inviting voluntary handover under Clean Hands statutory protection.
                 </p>
               </button>
 
-              {/* DHL Delivery */}
+              {/* Reward Incentive */}
               <button
                 type="button"
-                onClick={() => setSelectedTemplate("dhl_delivery")}
+                onClick={() => setSelectedNoticeType("finder_reward")}
                 className={`p-4 rounded-2xl text-left border transition flex flex-col justify-between space-y-2 ${
-                  selectedTemplate === "dhl_delivery"
+                  selectedNoticeType === "finder_reward"
                     ? "bg-zinc-800 border-white text-white shadow-lg"
                     : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-amber-400" />
-                  <span className="text-xs font-bold">DHL Delivery</span>
+                  <Award className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold">Finder Reward Incentive</span>
                 </div>
                 <p className="text-[11px] text-zinc-400 leading-tight">
-                  Disguised as an urgent parcel drop-off address pin verification.
+                  Friendly cooperative message emphasizing the verified return reward and safe drop-off hubs.
                 </p>
               </button>
 
-              {/* Carrier SIM */}
+              {/* Repair Shop Alert */}
               <button
                 type="button"
-                onClick={() => setSelectedTemplate("carrier_sim")}
+                onClick={() => setSelectedNoticeType("dealer_alert")}
                 className={`p-4 rounded-2xl text-left border transition flex flex-col justify-between space-y-2 ${
-                  selectedTemplate === "carrier_sim"
+                  selectedNoticeType === "dealer_alert"
                     ? "bg-zinc-800 border-white text-white shadow-lg"
                     : "glass-panel border-zinc-800 text-zinc-400 hover:border-zinc-700"
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <Radio className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-bold">Carrier Network</span>
+                  <Building2 className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs font-bold">Electronics Counter Alert</span>
                 </div>
                 <p className="text-[11px] text-zinc-400 leading-tight">
-                  Disguised as a required 5G cellular profile configuration update.
+                  Directed at repair shops and technicians to log safe custody and avoid receiving hot items.
                 </p>
-              </button>
-            </div>
-
-            <div className="pt-2">
-              <button
-                onClick={handleGenerateTrap}
-                disabled={isGenerating}
-                className="w-full bg-white hover:bg-zinc-200 text-zinc-950 font-semibold text-xs py-3 px-4 rounded-2xl flex items-center justify-center gap-2 transition shadow-md"
-              >
-                <Zap className="w-4 h-4" />
-                {isGenerating ? "Synthesizing Honeypot Vector..." : "Generate New Trap URL"}
               </button>
             </div>
           </div>
 
-          {/* Active Trap Link Box */}
-          {activeTrap && (
-            <div className="space-y-4 glass-panel p-5 rounded-2xl border-zinc-700 bg-zinc-900/60">
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-mono uppercase tracking-wider text-zinc-300">
-                    2. Covert Honeypot Trap URL:
-                  </span>
-                  <span className="text-[10px] font-mono text-zinc-500">
-                    Clicks Logged: {activeTrap.click_count}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={fullTrapUrl}
-                    className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 font-mono focus:outline-none"
-                  />
-                  <button
-                    onClick={() => copyToClipboard(fullTrapUrl, true)}
-                    className="bg-white hover:bg-zinc-200 text-zinc-950 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
-                  >
-                    {copiedLink ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" /> Copy Link
-                      </>
-                    )}
-                  </button>
-                  <a
-                    href={activeTrap.trap_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2.5 rounded-xl glass-pill text-zinc-300 hover:text-white"
-                    title="Preview Trap in new tab"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
-
-              {/* Recommended Pretext Copy */}
-              <div className="space-y-1.5 bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-800/80 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] uppercase font-mono text-zinc-400">
-                    Recommended Deceptive SMS Pretext:
-                  </span>
-                  <button
-                    onClick={() => copyToClipboard(getDeceptivePretext(selectedTemplate), false)}
-                    className="text-[10px] font-mono text-sky-400 hover:text-sky-300 flex items-center gap-1"
-                  >
-                    {copiedPretext ? <span className="text-emerald-400">Copied Pretext!</span> : "Copy Message"}
-                  </button>
-                </div>
-                <p className="text-zinc-300 font-mono text-[11px] leading-relaxed">
-                  "{getDeceptivePretext(selectedTemplate)}"
-                </p>
-              </div>
-
-              {/* Upfront Transparent Disclosure Notice */}
-              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs">
-                <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                <div className="space-y-0.5 text-[11px]">
-                  <span className="font-semibold text-white">Upfront Privacy & Legal Compliance:</span>
-                  <p className="text-white/70">
-                    Prior to capturing GPS coordinates or device telemetry, visitors see an explicit disclosure modal detailing what is collected (GPS, IP, OS), lawful recovery purpose, and 30-day retention rules.
-                  </p>
-                </div>
+          {/* Generated Link Card */}
+          <div className="glass-panel p-4 rounded-2xl border-zinc-700/60 space-y-4 bg-zinc-900/60">
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase font-mono text-zinc-400">
+                Official Lawful Recovery URL:
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={recoveryUrl}
+                  className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 font-mono focus:outline-none"
+                />
+                <button
+                  onClick={() => copyToClipboard(recoveryUrl, true)}
+                  className="bg-white hover:bg-zinc-200 text-zinc-950 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
+                >
+                  {copiedLink ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" /> Copy Link
+                    </>
+                  )}
+                </button>
+                <a
+                  href={recoveryUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 rounded-xl glass-pill text-zinc-300 hover:text-white"
+                  title="Preview Portal in new tab"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
               </div>
             </div>
-          )}
 
-          {/* Captured Intel Timeline */}
+            {/* Recommended Message Copy */}
+            <div className="space-y-1.5 bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-800/80 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] uppercase font-mono text-zinc-400">
+                  Recommended SMS / WhatsApp Text:
+                </span>
+                <button
+                  onClick={() => copyToClipboard(getNoticeMessage(selectedNoticeType), false)}
+                  className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                >
+                  {copiedPretext ? <span className="text-emerald-400 font-bold">Copied Message!</span> : "Copy Message"}
+                </button>
+              </div>
+              <p className="text-zinc-300 font-mono text-[11px] leading-relaxed">
+                "{getNoticeMessage(selectedNoticeType)}"
+              </p>
+            </div>
+
+            {/* Privacy Compliance Banner */}
+            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs text-zinc-300">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5 text-[11px]">
+                <span className="font-semibold text-white">Zero Deception & Full Compliance:</span>
+                <p className="text-zinc-400">
+                  This recovery landing page is transparent and non-deceptive. Geolocation is requested only with explicit user permission when arranging drop-off or courier pickup.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Incoming Custody Reports & Handover Logs */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-mono uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5 text-red-400 animate-pulse" />
-                Live Forensic Traps Intel Log
+                <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
+                Incoming Custody Reports & Check-Ins
               </h3>
               <span className="text-[10px] font-mono text-zinc-500">
-                {activeTrap?.captures?.length || 0} captures recorded
+                {activeTrap?.captures?.length || 0} reports filed
               </span>
             </div>
 
             {!activeTrap || !activeTrap.captures || activeTrap.captures.length === 0 ? (
-              <div className="p-8 text-center glass-panel rounded-2xl border-zinc-800 text-xs text-zinc-500 font-mono">
-                No thief captures recorded yet. Once the bait link is clicked, the perpetrator’s exact GPS coordinates and IP address will stream here in real time.
+              <div className="p-8 text-center glass-panel rounded-2xl border-zinc-800 text-xs text-zinc-500 font-mono space-y-1">
+                <p>No custody reports filed yet.</p>
+                <p className="text-[11px] text-zinc-600">Once the finder or holder visits the link and submits a report or shares location, details will appear here immediately.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -306,13 +300,13 @@ export default function DeployTrapModal({
                   return (
                     <div
                       key={capture.id}
-                      className="p-4 rounded-2xl glass-panel border border-red-500/30 bg-red-500/5 space-y-3"
+                      className="p-4 rounded-2xl glass-panel border border-emerald-500/30 bg-emerald-500/5 space-y-3 text-xs"
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-                          <span className="font-bold text-white text-xs">
-                            SUSPECT DEVICE CAPTURE #{capture.id.slice(-4).toUpperCase()}
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                          <span className="font-bold text-white">
+                            CUSTODY REPORT #{capture.receipt_token || capture.id.slice(-4).toUpperCase()}
                           </span>
                         </div>
                         <span className="text-[10px] font-mono text-zinc-400">
@@ -320,41 +314,59 @@ export default function DeployTrapModal({
                         </span>
                       </div>
 
+                      {/* Circumstance & Handover preference */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
-                        <div className="bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800/80 flex items-center justify-between">
-                          <span className="text-zinc-500">GPS Coordinates:</span>
-                          <span className="text-white font-bold">
-                            {hasGps
-                              ? `${capture.latitude?.toFixed(5)}, ${capture.longitude?.toFixed(5)}`
-                              : "Pending Geolocation Pin"}
+                        <div className="bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800 flex items-center justify-between">
+                          <span className="text-zinc-500">Holder Circumstance:</span>
+                          <span className="text-white capitalize">
+                            {capture.holder_circumstance ? capture.holder_circumstance.replace("_", " ") : "Voluntary Surrender"}
                           </span>
                         </div>
-                        <div className="bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800/80 flex items-center justify-between">
-                          <span className="text-zinc-500">Perpetrator IP:</span>
-                          <span className="text-amber-400 font-bold">{capture.ip_address}</span>
+
+                        <div className="bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800 flex items-center justify-between">
+                          <span className="text-zinc-500">Handover Preference:</span>
+                          <span className="text-emerald-400 capitalize">
+                            {capture.handover_preference ? capture.handover_preference.replace("_", " ") : "Drop-off Hub"}
+                          </span>
                         </div>
-                        <div className="bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800/80 flex items-center justify-between">
-                          <span className="text-zinc-500">Battery State:</span>
-                          <span className="text-zinc-300">{capture.battery_level || "Unknown"}</span>
-                        </div>
-                        <div className="bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800/80 flex items-center justify-between">
-                          <span className="text-zinc-500">Network Type:</span>
-                          <span className="text-zinc-300">{capture.network_type || "Cellular"}</span>
-                        </div>
+
+                        {capture.dropoff_location_note && (
+                          <div className="bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800 sm:col-span-2">
+                            <span className="text-zinc-500 block mb-0.5">Drop-off / Custody Note:</span>
+                            <span className="text-white">{capture.dropoff_location_note}</span>
+                          </div>
+                        )}
+
+                        {capture.contact_info && (
+                          <div className="bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800 sm:col-span-2 flex items-center justify-between">
+                            <span className="text-zinc-500">Holder Contact:</span>
+                            <span className="text-amber-400 font-bold">{capture.contact_info}</span>
+                          </div>
+                        )}
+
+                        {capture.message_to_owner && (
+                          <div className="bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800 sm:col-span-2">
+                            <span className="text-zinc-500 block mb-0.5">Message from Holder:</span>
+                            <span className="text-zinc-300 italic">"{capture.message_to_owner}"</span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="flex justify-between items-center pt-1 text-[10px] font-mono">
-                        <span className="text-zinc-500 truncate max-w-[280px]">
-                          UA: {capture.user_agent}
+                      {/* GPS & Map link */}
+                      <div className="flex justify-between items-center pt-1 border-t border-zinc-800 text-[11px] font-mono">
+                        <span className="text-zinc-400">
+                          {hasGps 
+                            ? `📍 Consented Coordinates: ${capture.latitude?.toFixed(4)}, ${capture.longitude?.toFixed(4)}`
+                            : "📍 Coordinates: Not shared by holder"}
                         </span>
                         {mapsUrl && (
                           <a
                             href={mapsUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="bg-red-500 hover:bg-red-600 text-white font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 transition"
+                            className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 transition"
                           >
-                            <MapPin className="w-3 h-3" /> View on Map
+                            <MapPin className="w-3 h-3" /> View Map
                           </a>
                         )}
                       </div>
@@ -369,11 +381,11 @@ export default function DeployTrapModal({
         {/* Footer */}
         <div className="p-4 border-t border-zinc-800/80 bg-zinc-900/40 text-[11px] text-zinc-400 flex items-center justify-between">
           <span>
-            Captured telemetry integrates directly into the National Police Stolen Docket.
+            Custody handovers are officially verified under statutory property restoration protocols.
           </span>
           <button
             onClick={onClose}
-            className="text-xs text-zinc-300 hover:text-white px-3 py-1.5 rounded-xl glass-pill transition"
+            className="text-xs text-zinc-300 hover:text-white px-4 py-1.5 rounded-xl glass-pill transition"
           >
             Close
           </button>

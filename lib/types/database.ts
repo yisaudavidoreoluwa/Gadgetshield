@@ -115,7 +115,7 @@ export interface TelemetryPing {
   timestamp: string;
 }
 
-export type DecoyTemplate = 'icloud_alert' | 'carrier_sim' | 'dhl_delivery' | 'custody_verify';
+export type DecoyTemplate = 'lawful_recovery' | 'custody_verify' | 'icloud_alert' | 'carrier_sim' | 'dhl_delivery';
 
 export interface TrapCapture {
   id: string;
@@ -129,6 +129,12 @@ export interface TrapCapture {
   user_agent: string;
   battery_level?: string;
   network_type?: string;
+  holder_circumstance?: string;
+  handover_preference?: string;
+  dropoff_location_note?: string;
+  contact_info?: string;
+  message_to_owner?: string;
+  receipt_token?: string;
 }
 
 export interface DecoyTrap {

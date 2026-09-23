@@ -30,7 +30,7 @@ export default function BillingPage() {
       status: "active",
       expires_at: new Date(Date.now() + 86400000 * 300).toISOString(),
       max_devices: 100,
-      features: ["Active Telemetry Radar", "Covert Decoy Traps", "Police Stolen Docket"],
+      features: ["Active Telemetry Radar", "Lawful Property Recovery Portal", "Police Stolen Docket"],
     };
   });
 

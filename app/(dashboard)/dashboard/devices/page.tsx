@@ -265,14 +265,14 @@ export default function DevicesPage() {
 
                 {/* Actions Row */}
                 <div className="space-y-2 pt-1 text-xs">
-                  {/* Stolen Specific Emergency Covert Trap Action */}
+                  {/* Stolen Specific Lawful Recovery Action */}
                   {isStolen && (
                     <button
                       onClick={() => setActiveTrapDevice(device)}
-                      className="w-full bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white py-2 px-3 rounded-xl font-semibold transition flex items-center justify-center gap-1.5 shadow-lg shadow-red-950/50"
+                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white py-2 px-3 rounded-xl font-semibold transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/50"
                     >
-                      <Zap className="w-3.5 h-3.5" />
-                      Deploy Recovery Trap (Bait Thief)
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Lawful Recovery & Custody Portal
                     </button>
                   )}
 

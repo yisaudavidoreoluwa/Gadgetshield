@@ -493,12 +493,13 @@ class HybridStore {
     return traps.find(t => t.id === trapId) || null;
   }
 
-  createDecoyTrap(deviceId: string, template: DecoyTemplate): DecoyTrap {
+  createDecoyTrap(deviceId: string, template: DecoyTemplate = "lawful_recovery"): DecoyTrap {
     const traps = this.getDecoyTraps();
-    const trapId = `trap-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const trapId = `rec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
-    let baitTitle = "Emergency Hardware Security Alert";
-    if (template === "icloud_alert") baitTitle = "iCloud // Urgent Location Found Verification";
+    let baitTitle = "Official Property Recovery & Custody Desk";
+    if (template === "lawful_recovery" || template === "custody_verify") baitTitle = "Gadgetshield Property Recovery & Custody Handover";
+    else if (template === "icloud_alert") baitTitle = "iCloud // Urgent Location Found Verification";
     else if (template === "dhl_delivery") baitTitle = "DHL Express // Package Delivery Tracking Update";
     else if (template === "carrier_sim") baitTitle = "Carrier SIM // Network Provisioning Certificate";
 
@@ -507,7 +508,7 @@ class HybridStore {
       device_id: deviceId,
       template,
       bait_title: baitTitle,
-      trap_url: `/trap/${trapId}`,
+      trap_url: `/recover/${trapId}`,
       click_count: 0,
       created_at: new Date().toISOString(),
       captures: []
@@ -528,6 +529,12 @@ class HybridStore {
     user_agent?: string;
     battery_level?: string;
     network_type?: string;
+    holder_circumstance?: string;
+    handover_preference?: string;
+    dropoff_location_note?: string;
+    contact_info?: string;
+    message_to_owner?: string;
+    receipt_token?: string;
   }): TrapCapture | null {
     const traps = this.getDecoyTraps();
     let recordedCapture: TrapCapture | null = null;
@@ -545,7 +552,13 @@ class HybridStore {
           ip_address: captureData.ip_address || "127.0.0.1",
           user_agent: captureData.user_agent || "Mobile Browser",
           battery_level: captureData.battery_level,
-          network_type: captureData.network_type || "Cellular Wireless"
+          network_type: captureData.network_type || "Cellular Wireless",
+          holder_circumstance: captureData.holder_circumstance,
+          handover_preference: captureData.handover_preference,
+          dropoff_location_note: captureData.dropoff_location_note,
+          contact_info: captureData.contact_info,
+          message_to_owner: captureData.message_to_owner,
+          receipt_token: captureData.receipt_token,
         };
 
         const updatedCaptures = [recordedCapture, ...trap.captures];
@@ -562,8 +575,8 @@ class HybridStore {
     if (this.isBrowser()) {
       localStorage.setItem(STORAGE_KEYS.DECOY_TRAPS, JSON.stringify(updated));
 
-      // Also update device last seen if coordinates were obtained
-      if (recordedCapture && (recordedCapture as TrapCapture).latitude) {
+      // Also update device last seen if coordinates or custody note were obtained
+      if (recordedCapture) {
         const foundTrap = traps.find(t => t.id === trapId);
         if (foundTrap) {
           const cap = recordedCapture as TrapCapture;
@@ -576,9 +589,11 @@ class HybridStore {
                   return {
                     ...d,
                     last_seen_at: cap.timestamp,
-                    last_seen_location: `Honeypot Trap Capture (${cap.network_type || "Mobile Device"})`,
-                    last_seen_lat: cap.latitude,
-                    last_seen_lng: cap.longitude,
+                    last_seen_location: cap.latitude 
+                      ? `Custody Report (${cap.handover_preference || "Location Verified"})` 
+                      : `Custody Report Filed: ${cap.dropoff_location_note || cap.handover_preference || "Safe Holding"}`,
+                    last_seen_lat: cap.latitude ?? d.last_seen_lat,
+                    last_seen_lng: cap.longitude ?? d.last_seen_lng,
                     last_seen_ip: cap.ip_address
                   };
                 }

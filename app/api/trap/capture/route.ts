@@ -11,17 +11,23 @@ export async function POST(req: NextRequest) {
       accuracy, 
       battery_level, 
       network_type, 
-      user_agent 
+      user_agent,
+      holder_circumstance,
+      handover_preference,
+      dropoff_location_note,
+      contact_info,
+      message_to_owner,
+      receipt_token
     } = body;
 
     if (!trap_id) {
       return NextResponse.json({ error: "trap_id is required" }, { status: 400 });
     }
 
-    // Extract thief's real network IP address from edge headers
+    // Extract network IP address from edge headers
     const forwarded = req.headers.get("x-forwarded-for");
     const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
-    const headerUserAgent = req.headers.get("user-agent") || user_agent || "Mobile Browser Session";
+    const headerUserAgent = req.headers.get("user-agent") || user_agent || "Custody Handover Session";
     const timestamp = new Date().toISOString();
 
     const captureRecord = {
@@ -36,6 +42,12 @@ export async function POST(req: NextRequest) {
       user_agent: headerUserAgent,
       battery_level: battery_level ? `${battery_level}%` : undefined,
       network_type: network_type || "Cellular Wireless",
+      holder_circumstance,
+      handover_preference,
+      dropoff_location_note,
+      contact_info,
+      message_to_owner,
+      receipt_token,
     };
 
     // Attempt Supabase persistence if tables exist
